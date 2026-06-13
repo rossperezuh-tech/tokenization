@@ -1,0 +1,177 @@
+"""SQLAlchemy database setup and all ORM models for the Vesta tokenization pipeline."""
+
+from datetime import datetime
+from sqlalchemy import (
+    create_engine, Column, Integer, String, Float, Boolean,
+    DateTime, Text, ForeignKey, Enum as SAEnum
+)
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+import enum
+import os
+
+DB_PATH = os.environ.get("VESTA_DB_PATH", "vesta.db")
+engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+class LeadSource(str, enum.Enum):
+    INBOUND = "Inbound - Motivated Seller"
+    OUTBOUND_LOOPNET = "Outbound - LoopNet"
+    OUTBOUND_CREXI = "Outbound - Crexi"
+
+
+class PipelineStage(str, enum.Enum):
+    NEW_LEAD = "New Lead"
+    CONTACTED = "Contacted"
+    INTERESTED = "Interested"
+    LOI_SIGNED = "LOI Signed"
+    DUE_DILIGENCE = "Due Diligence"
+    TOKEN_OFFERING = "Token Offering"
+    CLOSED = "Closed"
+
+
+class PropertyType(str, enum.Enum):
+    MULTIFAMILY = "Multifamily"
+    INDUSTRIAL = "Industrial"
+    MIXED_USE = "Mixed-Use"
+    RETAIL = "Retail"
+    OFFICE = "Office"
+    OTHER = "Other"
+
+
+class OutreachStatus(str, enum.Enum):
+    SENT = "sent"
+    OPENED = "opened"
+    REPLIED = "replied"
+    BOOKED_CALL = "booked_call"
+
+
+class Lead(Base):
+    __tablename__ = "leads"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Source tracking
+    source = Column(String(60), nullable=False)
+    external_id = Column(String(120), unique=True, nullable=True)  # Formspree submission ID or listing URL
+
+    # Property details
+    address = Column(String(300), nullable=False)
+    city = Column(String(100))
+    state = Column(String(50))
+    zip_code = Column(String(20))
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+
+    property_type = Column(String(60))
+    asking_price = Column(Float, nullable=True)
+    sqft = Column(Float, nullable=True)
+    cap_rate = Column(Float, nullable=True)   # percentage, e.g. 6.5 means 6.5%
+    noi = Column(Float, nullable=True)        # net operating income
+
+    # Market data
+    days_on_market = Column(Integer, nullable=True)
+    had_price_reduction = Column(Boolean, default=False)
+
+    # Seller / broker contact
+    seller_name = Column(String(200))
+    seller_email = Column(String(200))
+    seller_phone = Column(String(50))
+    reason_for_selling = Column(Text)
+
+    broker_name = Column(String(200))
+    broker_email = Column(String(200))
+    broker_phone = Column(String(50))
+
+    # Scoring
+    score = Column(Integer, default=0)
+    score_breakdown = Column(Text)  # JSON blob with per-category scores
+
+    # Pipeline
+    pipeline_stage = Column(String(60), default=PipelineStage.NEW_LEAD.value)
+    in_pipeline = Column(Boolean, default=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_scraped_at = Column(DateTime, nullable=True)
+
+    # Raw data blob for anything we didn't explicitly parse
+    raw_data = Column(Text)
+
+    # Relationships
+    outreach_records = relationship("Outreach", back_populates="lead", cascade="all, delete-orphan")
+    price_history = relationship("PriceHistory", back_populates="lead", cascade="all, delete-orphan")
+    pipeline_record = relationship("Pipeline", back_populates="lead", uselist=False, cascade="all, delete-orphan")
+
+
+class Outreach(Base):
+    __tablename__ = "outreach"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False)
+
+    email_type = Column(String(60))   # "cold_broker" | "cold_owner" | "inbound_followup"
+    recipient_email = Column(String(200))
+    subject = Column(String(500))
+    body = Column(Text)
+    status = Column(String(40), default=OutreachStatus.SENT.value)
+
+    sent_at = Column(DateTime, nullable=True)
+    opened_at = Column(DateTime, nullable=True)
+    replied_at = Column(DateTime, nullable=True)
+    booked_call_at = Column(DateTime, nullable=True)
+
+    # Follow-up scheduling
+    followup_7d_due = Column(DateTime, nullable=True)
+    followup_14d_due = Column(DateTime, nullable=True)
+    followup_7d_sent = Column(Boolean, default=False)
+    followup_14d_sent = Column(Boolean, default=False)
+
+    resend_message_id = Column(String(200))   # Resend.com message ID for tracking
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    lead = relationship("Lead", back_populates="outreach_records")
+
+
+class Pipeline(Base):
+    __tablename__ = "pipeline"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), unique=True, nullable=False)
+
+    stage = Column(String(60), default=PipelineStage.NEW_LEAD.value)
+    deal_value = Column(Float, nullable=True)     # our projected token raise amount
+    notes = Column(Text)
+
+    stage_entered_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    lead = relationship("Lead", back_populates="pipeline_record")
+
+
+class PriceHistory(Base):
+    __tablename__ = "price_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False)
+
+    price = Column(Float, nullable=False)
+    recorded_at = Column(DateTime, default=datetime.utcnow)
+    source = Column(String(60))
+
+    lead = relationship("Lead", back_populates="price_history")
+
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
