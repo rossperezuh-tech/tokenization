@@ -1,20 +1,20 @@
-"""
-Vesta Tokenization Pipeline — FastAPI entry point.
+"""Vesta Tokenization Pipeline — FastAPI entry point.
 
 Run:  uvicorn main:app --reload --port 8000
 """
 
-import asyncio
 import logging
 import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
 from models.database import init_db
+from api import leads, pipeline, outreach, analytics
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,6 +31,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(leads.router, prefix="/api/leads", tags=["leads"])
+app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"])
+app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+
+# Serve built React frontend
+_frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(_frontend_dist):
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")
+
 
 @app.on_event("startup")
 async def startup():
@@ -44,6 +54,7 @@ def _start_scheduler():
         from apscheduler.triggers.cron import CronTrigger
         from apscheduler.triggers.interval import IntervalTrigger
         from services.formspree_poller import poll_formspree
+        from services.alerts import send_daily_digest, send_weekly_report, check_price_drops
         from scrapers.loopnet import scrape_loopnet
         from scrapers.crexi import scrape_crexi
         from models.database import SessionLocal
@@ -53,40 +64,49 @@ def _start_scheduler():
         async def _run_formspree():
             db = SessionLocal()
             try:
-                leads = poll_formspree(db)
-                logging.getLogger(__name__).info("Formspree poll: %d new leads", len(leads))
+                leads_found = poll_formspree(db)
+                # SMS alert for hot inbound leads
+                from services.alerts import alert_hot_inbound
+                for lead in leads_found:
+                    if "Inbound" in lead.source and lead.score >= 70:
+                        alert_hot_inbound(lead)
             finally:
                 db.close()
 
         async def _run_scrapers():
             db = SessionLocal()
             try:
-                ln = await scrape_loopnet(db)
-                cr = await scrape_crexi(db)
-                logging.getLogger(__name__).info(
-                    "Scrapers done: LoopNet=%d Crexi=%d new leads", len(ln), len(cr)
-                )
+                await scrape_loopnet(db)
+                await scrape_crexi(db)
+                check_price_drops(db)
             finally:
                 db.close()
 
-        # Formspree poll every hour
-        scheduler.add_job(_run_formspree, IntervalTrigger(hours=1), id="formspree_poll")
+        async def _daily_digest():
+            db = SessionLocal()
+            try:
+                send_daily_digest(db)
+            finally:
+                db.close()
 
-        # Scrapers daily at 6am
+        async def _weekly_report():
+            db = SessionLocal()
+            try:
+                send_weekly_report(db)
+            finally:
+                db.close()
+
+        scheduler.add_job(_run_formspree, IntervalTrigger(hours=1), id="formspree_poll")
         scheduler.add_job(_run_scrapers, CronTrigger(hour=6, minute=0), id="daily_scrape")
+        scheduler.add_job(_daily_digest, CronTrigger(hour=7, minute=0), id="daily_digest")
+        scheduler.add_job(_weekly_report, CronTrigger(day_of_week="mon", hour=8, minute=0), id="weekly_report")
 
         scheduler.start()
-        logging.getLogger(__name__).info("Scheduler started (Formspree hourly, scrapers daily 6am)")
-    except ImportError:
-        logging.getLogger(__name__).warning("APScheduler not installed — scheduler disabled")
+        logging.getLogger(__name__).info("Scheduler started")
+    except ImportError as exc:
+        logging.getLogger(__name__).warning("APScheduler not installed — scheduler disabled: %s", exc)
 
 
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "vesta-pipeline"}
-
-
-# API routers are imported here (added in later build steps)
-# from api import leads, pipeline, outreach, analytics
-# app.include_router(leads.router, prefix="/api/leads")
-# app.include_router(pipeline.router, prefix="/api/pipeline")

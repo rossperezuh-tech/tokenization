@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 font-sans;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-3 py-1.5 rounded text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-vesta-500 hover:bg-vesta-600 text-white;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-gray-700 text-gray-300;
+  }
+  .card {
+    @apply bg-gray-900 rounded-xl border border-gray-800;
+  }
+  .badge-hot   { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-red-900/60 text-red-300; }
+  .badge-warm  { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-900/60 text-yellow-300; }
+  .badge-cold  { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-900/60 text-green-300; }
+  .badge-inbound  { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-vesta-900/60 text-vesta-100; }
+  .badge-outbound { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-700 text-gray-200; }
+}
+
+/* Leaflet overrides */
+.leaflet-container { background: #111827; }
+.leaflet-tile { filter: brightness(0.85) saturate(0.7); }
+
+/* Kanban scrollbar */
+.kanban-col { min-height: 200px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
