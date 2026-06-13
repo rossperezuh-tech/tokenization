@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Nexus Capital — Investor Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Outfit:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ════════════════════════════════════════════════════════════════
+   NEXUS — investor dashboard v2
+   Direction: a private-bank terminal. Dark lacquer, brushed gold,
+   serif italic headlines, tabular mono figures, live canvases.
+   Signature: the distribution "coupon rail" — payouts as ticket stubs.
+   ════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#07080a;
+  --s1:#0d1014;
+  --s2:#13171d;
+  --s3:#1b2028;
+  --line:#222831;
+  --line2:#1a1f27;
+  --gold:#c9a96e;
+  --gold2:#e0c48a;
+  --gold-dim:rgba(201,169,110,.14);
+  --cream:#eae6dc;
+  --mid:#8a8678;
+  --mut:#5a5850;
+  --green:#4ec98a;
+  --green-dim:rgba(78,201,138,.12);
+  --red:#e06060;
+  --red-dim:rgba(224,96,96,.12);
+  --blue:#68a6d2;
+  --fd:'Cormorant Garamond',Georgia,serif;
+  --fs:'Outfit',system-ui,sans-serif;
+  --fm:'DM Mono',ui-monospace,monospace;
+  --ease:cubic-bezier(.22,.8,.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--cream);font-family:var(--fs);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+::selection{background:var(--gold);color:var(--bg)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:3px}
+a{color:inherit}
+
+.app{display:grid;grid-template-columns:228px 1fr;min-height:100vh}
+
+/* ── SIDEBAR ── */
+aside{background:var(--s1);border-right:1px solid var(--line2);padding:22px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:11px;padding:0 22px 22px;border-bottom:1px solid var(--line2)}
+.brand-mark{width:34px;height:34px;border:1.4px solid var(--gold);border-radius:50%;display:grid;place-items:center;flex-shrink:0}
+.brand-mark svg{width:14px;height:14px}
+.brand-name{font-family:var(--fd);font-size:18px;font-weight:600;letter-spacing:.12em}
+.brand-sub{font-family:var(--fm);font-size:8.5px;letter-spacing:.22em;color:var(--mut);display:block;margin-top:1px}
+.side-nav{padding:18px 12px;flex:1}
+.snav{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:7px;color:var(--mid);text-decoration:none;font-size:13.5px;margin-bottom:3px;transition:background .2s,color .2s;border:1px solid transparent}
+.snav svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.snav:hover{color:var(--cream);background:var(--s2)}
+.snav.on{color:var(--gold2);background:var(--gold-dim);border-color:rgba(201,169,110,.22)}
+.side-foot{padding:16px 22px;border-top:1px solid var(--line2);font-family:var(--fm);font-size:10px;color:var(--mut);line-height:1.7}
+.side-foot b{color:var(--green);font-weight:500}
+
+/* ── MAIN ── */
+main{padding:0 0 56px;min-width:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:18px 30px;border-bottom:1px solid var(--line2);background:rgba(7,8,10,.85);backdrop-filter:blur(12px);position:sticky;top:0;z-index:20}
+.tb-title{font-family:var(--fd);font-size:24px;font-weight:500;font-style:italic;color:var(--cream)}
+.tb-right{display:flex;align-items:center;gap:14px}
+.tb-search{display:flex;align-items:center;gap:9px;background:var(--s2);border:1px solid var(--line);border-radius:7px;padding:8px 13px;min-width:230px;color:var(--mut)}
+.tb-search svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round}
+.tb-search input{background:none;border:none;outline:none;color:var(--cream);font-family:var(--fs);font-size:13px;width:100%}
+.tb-search input::placeholder{color:var(--mut)}
+.tb-bell{position:relative;width:36px;height:36px;border-radius:7px;background:var(--s2);border:1px solid var(--line);display:grid;place-items:center;cursor:pointer;transition:border-color .2s}
+.tb-bell:hover{border-color:var(--gold)}
+.tb-bell svg{width:16px;height:16px;stroke:var(--mid);fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tb-bell i{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--gold);border:2px solid var(--s2)}
+.tb-user{display:flex;align-items:center;gap:10px;cursor:pointer}
+.tb-ava{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#8a6d3a);display:grid;place-items:center;font-family:var(--fd);font-weight:600;font-size:15px;color:var(--bg)}
+.tb-user span{font-size:13px;color:var(--mid)}
+
+.wrap{padding:28px 30px;max-width:1280px}
+
+/* ── KPI ROW ── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.kpi{background:var(--s1);border:1px solid var(--line2);border-radius:11px;padding:20px 20px 14px;position:relative;overflow:hidden;transition:border-color .25s,transform .25s var(--ease)}
+.kpi:hover{border-color:var(--line);transform:translateY(-2px)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,var(--gold));opacity:.85}
+.kpi-l{font-family:var(--fm);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--mut);margin-bottom:9px}
+.kpi-v{font-family:var(--fm);font-size:26px;font-weight:500;color:var(--cream);letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1}
+.kpi-d{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px}
+.kpi-chg{font-family:var(--fm);font-size:11.5px}
+.up{color:var(--green)}.dn{color:var(--red)}
+.kpi canvas{height:26px;width:88px}
+
+/* ── PANELS ── */
+.panel{background:var(--s1);border:1px solid var(--line2);border-radius:12px;overflow:hidden;margin-bottom:24px}
+.panel-h{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 22px;border-bottom:1px solid var(--line2)}
+.panel-h h2{font-family:var(--fd);font-size:21px;font-weight:500;font-style:italic;color:var(--cream)}
+.panel-h .ph-sub{font-family:var(--fm);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);margin-top:1px}
+.seg{display:flex;background:var(--s2);border:1px solid var(--line);border-radius:7px;padding:3px}
+.seg button{background:none;border:none;color:var(--mid);font-family:var(--fm);font-size:11px;padding:6px 13px;border-radius:5px;cursor:pointer;transition:background .2s,color .2s}
+.seg button.on{background:var(--gold-dim);color:var(--gold2)}
+
+.grid-2{display:grid;grid-template-columns:1.55fr 1fr;gap:24px;margin-bottom:24px}
+.grid-2 .panel{margin-bottom:0}
+
+/* chart */
+.chart-wrap{padding:18px 22px 8px;position:relative}
+#mainChart{width:100%;height:280px;display:block}
+.tip{position:absolute;pointer-events:none;background:var(--s3);border:1px solid var(--line);border-radius:7px;padding:8px 11px;font-family:var(--fm);font-size:11px;color:var(--cream);transform:translate(-50%,-115%);white-space:nowrap;opacity:0;transition:opacity .15s;z-index:5}
+.tip b{color:var(--gold2);display:block;font-size:12.5px}
+.chart-foot{display:flex;gap:22px;padding:10px 22px 18px;font-family:var(--fm);font-size:10.5px;color:var(--mut)}
+.chart-foot b{color:var(--cream);font-weight:500}
+
+/* donut */
+.donut-wrap{padding:24px 22px;display:flex;align-items:center;gap:24px}
+#donut{width:168px;height:168px;flex-shrink:0}
+.legend{flex:1;display:flex;flex-direction:column;gap:12px}
+.lg{display:flex;align-items:center;gap:11px;font-size:13px;color:var(--mid)}
+.lg i{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.lg b{margin-left:auto;font-family:var(--fm);font-weight:500;color:var(--cream);font-size:12.5px}
+
+/* ── HOLDINGS TABLE ── */
+table{width:100%;border-collapse:collapse}
+th{font-family:var(--fm);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);text-align:left;padding:13px 22px;border-bottom:1px solid var(--line2);cursor:pointer;user-select:none;white-space:nowrap}
+th .arr{display:inline-block;margin-left:5px;opacity:.4;transition:transform .2s,opacity .2s}
+th.sorted .arr{opacity:1;color:var(--gold)}
+th.desc .arr{transform:rotate(180deg)}
+td{padding:15px 22px;border-bottom:1px solid var(--line2);font-size:13.5px;vertical-align:middle}
+tbody tr{transition:background .15s}
+tbody tr:hover{background:var(--s2)}
+tbody tr:last-child td{border-bottom:none}
+.asset{display:flex;align-items:center;gap:12px}
+.asset i{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.asset b{font-weight:500;color:var(--cream);display:block}
+.asset span{font-size:11.5px;color:var(--mut)}
+.mono{font-family:var(--fm);font-variant-numeric:tabular-nums;color:var(--cream)}
+.yield-pill{font-family:var(--fm);font-size:11px;color:var(--green);background:var(--green-dim);border-radius:5px;padding:4px 9px;display:inline-block}
+.tr-bar{width:96px;height:4px;border-radius:2px;background:var(--s3);overflow:hidden}
+.tr-bar i{display:block;height:100%;border-radius:2px;background:var(--gold)}
+
+/* ── SIGNATURE: COUPON RAIL ── */
+.rail{display:flex;gap:16px;padding:20px 22px;overflow-x:auto;scrollbar-width:thin}
+.coupon{min-width:218px;background:var(--s2);border:1px solid var(--line);border-radius:10px;position:relative;padding:16px 18px;flex-shrink:0;transition:border-color .25s,transform .25s var(--ease)}
+.coupon:hover{border-color:var(--gold);transform:translateY(-3px)}
+.coupon::before,.coupon::after{content:'';position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:var(--s1);border:1px solid var(--line);transform:translateY(-50%)}
+.coupon::before{left:-8px}
+.coupon::after{right:-8px}
+.cp-top{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:11px;margin-bottom:11px;border-bottom:1px dashed var(--line)}
+.cp-top span{font-family:var(--fm);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.cp-status{font-family:var(--fm);font-size:9.5px;padding:3px 8px;border-radius:4px}
+.cp-status.paid{color:var(--green);background:var(--green-dim)}
+.cp-status.next{color:var(--gold2);background:var(--gold-dim)}
+.cp-amt{font-family:var(--fm);font-size:23px;font-weight:500;color:var(--cream);font-variant-numeric:tabular-nums}
+.cp-from{font-size:12px;color:var(--mid);margin-top:3px}
+.cp-date{font-family:var(--fm);font-size:10.5px;color:var(--mut);margin-top:9px}
+
+/* ── ORDER BOOK + ACTIVITY ── */
+.ob-row{display:grid;grid-template-columns:64px 1fr 90px;align-items:center;gap:12px;padding:9px 22px;font-family:var(--fm);font-size:12px}
+.ob-row:hover{background:var(--s2)}
+.ob-side{font-size:10px;letter-spacing:.1em;padding:3px 0;text-align:center;border-radius:4px}
+.ob-side.b{color:var(--green);background:var(--green-dim)}
+.ob-side.s{color:var(--red);background:var(--red-dim)}
+.ob-depth{height:5px;border-radius:3px;background:var(--s3);overflow:hidden}
+.ob-depth i{display:block;height:100%;border-radius:3px;transform-origin:left;animation:grow .8s var(--ease) both}
+.ob-depth.b i{background:var(--green)}
+.ob-depth.s i{background:var(--red)}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.ob-px{text-align:right;color:var(--cream)}
+.ob-px span{display:block;font-size:10px;color:var(--mut)}
+
+.act{padding:6px 0}
+.act-row{display:flex;gap:14px;padding:12px 22px;transition:background .15s}
+.act-row:hover{background:var(--s2)}
+.act-dot{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;background:var(--s3)}
+.act-dot svg{width:14px;height:14px;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.act-body b{font-weight:500;color:var(--cream);font-size:13px;display:block}
+.act-body span{font-size:12px;color:var(--mut)}
+.act-body .t{font-family:var(--fm);font-size:10px;color:var(--mut);display:block;margin-top:2px}
+
+/* responsive */
+@media(max-width:1080px){.grid-2{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:780px){
+  .app{grid-template-columns:1fr}
+  aside{display:none}
+  .wrap{padding:20px 16px}
+  .topbar{padding:14px 16px}
+  .tb-search{display:none}
+  .kpis{grid-template-columns:1fr 1fr;gap:12px}
+  .donut-wrap{flex-direction:column}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ── OFFERINGS (live from Vesta backend) ── */
+.offer-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;padding:20px 22px}
+.offer-card{background:var(--s2);border:1px solid var(--line);border-radius:11px;padding:18px;transition:border-color .25s,transform .25s var(--ease)}
+.offer-card:hover{border-color:var(--gold);transform:translateY(-3px)}
+.oc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px}
+.oc-name{font-family:var(--fd);font-size:19px;font-weight:500;font-style:italic;color:var(--cream);line-height:1.2}
+.oc-loc{font-family:var(--fm);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);margin-top:4px}
+.oc-yield{font-family:var(--fm);font-size:11px;color:var(--green);background:var(--green-dim);border-radius:5px;padding:4px 9px;white-space:nowrap}
+.oc-stats{display:flex;gap:14px;margin-bottom:14px}
+.oc-stat{flex:1}
+.oc-stat .l{font-family:var(--fm);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.oc-stat .v{font-family:var(--fm);font-size:15px;color:var(--cream);font-variant-numeric:tabular-nums;margin-top:3px}
+.oc-prog{display:flex;justify-content:space-between;font-family:var(--fm);font-size:10px;color:var(--mut);margin-bottom:6px}
+.oc-bar{height:5px;border-radius:3px;background:var(--s3);overflow:hidden;margin-bottom:14px}
+.oc-bar i{display:block;height:100%;border-radius:3px;background:var(--gold)}
+.oc-btn{display:block;text-align:center;font-family:var(--fs);font-weight:500;font-size:13.5px;color:var(--bg);background:var(--gold);border:none;border-radius:7px;padding:11px;cursor:pointer;text-decoration:none;transition:opacity .2s}
+.oc-btn:hover{opacity:.88}
+.offer-empty{padding:30px 22px;font-family:var(--fs);color:var(--mid);font-size:14px}
+.offer-empty span{display:block;font-family:var(--fm);font-size:11px;color:var(--mut);margin-top:6px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside>
+  <div class="brand">
+    <span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 4L19 19H5L12 4Z" fill="#c9a96e"/></svg></span>
+    <div>
+      <span class="brand-name">NEXUS</span>
+      <span class="brand-sub">INVESTOR&nbsp;PORTAL</span>
+    </div>
+  </div>
+  <nav class="side-nav" aria-label="Sections">
+    <a class="snav on" href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</a>
+    <a class="snav" href="#holdings"><svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Holdings</a>
+    <a class="snav" href="#distributions"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Distributions</a>
+    <a class="snav" href="#offerings"><svg viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Marketplace</a>
+    <a class="snav" href="#"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Documents</a>
+    <a class="snav" href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+  </nav>
+  <div class="side-foot">
+    KYC <b>VERIFIED</b> · ACCREDITED<br/>Member since 2024
+  </div>
+</aside>
+
+<!-- ═══ MAIN ═══ -->
+<main>
+  <div class="topbar">
+    <h1 class="tb-title">Good afternoon, J.</h1>
+    <div class="tb-right">
+      <label class="tb-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg><input type="text" placeholder="Search assets, documents…" aria-label="Search"/></label>
+      <button class="tb-bell" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><i></i></button>
+      <div class="tb-user"><div class="tb-ava">J</div><span>J. Chen ▾</span></div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- KPI ROW -->
+    <div class="kpis">
+      <div class="kpi" style="--accent:var(--gold)">
+        <p class="kpi-l">Portfolio value</p>
+        <p class="kpi-v" data-count="284750" data-pre="$">$0</p>
+        <div class="kpi-d"><span class="kpi-chg up">▲ +12.3% all-time</span><canvas data-spark="2,3,2,4,5,4,6,7,6,8" data-c="#c9a96e"></canvas></div>
+      </div>
+      <div class="kpi" style="--accent:var(--green)">
+        <p class="kpi-l">Income this year</p>
+        <p class="kpi-v" data-count="18922" data-pre="$">$0</p>
+        <div class="kpi-d"><span class="kpi-chg up">▲ 4 distributions</span><canvas data-spark="1,2,2,3,3,4,5,5,6,7" data-c="#4ec98a"></canvas></div>
+      </div>
+      <div class="kpi" style="--accent:var(--blue)">
+        <p class="kpi-l">Blended yield</p>
+        <p class="kpi-v" data-count="7.4" data-dec="1" data-suf="%">0%</p>
+        <div class="kpi-d"><span class="kpi-chg up">▲ +0.3% vs last yr</span><canvas data-spark="4,4,5,4,5,5,6,5,6,6" data-c="#68a6d2"></canvas></div>
+      </div>
+      <div class="kpi" style="--accent:var(--gold2)">
+        <p class="kpi-l">Properties held</p>
+        <p class="kpi-v" data-count="4">0</p>
+        <div class="kpi-d"><span class="kpi-chg" style="color:var(--mid)">2 tradeable now</span><canvas data-spark="1,1,2,2,2,3,3,4,4,4" data-c="#e0c48a"></canvas></div>
+      </div>
+    </div>
+
+    <!-- CURRENT OFFERINGS (live from Vesta pipeline) -->
+    <div class="panel" id="offerings">
+      <div class="panel-h">
+        <div><h2>Current offerings</h2><p class="ph-sub">Open to invest · sourced from the Vesta pipeline</p></div>
+        <div class="seg"><button class="on" id="offRefresh">↻ Refresh</button></div>
+      </div>
+      <div class="offer-grid" id="offerGrid">
+        <div class="offer-empty">Loading offerings…</div>
+      </div>
+    </div>
+
+    <!-- CHART + ALLOCATION -->
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-h">
+          <div><h2>Portfolio performance</h2><p class="ph-sub">Value over time · USD</p></div>
+          <div class="seg" id="rangeSeg" role="group" aria-label="Time range">
+            <button data-r="3">3M</button>
+            <button data-r="6">6M</button>
+            <button class="on" data-r="12">1Y</button>
+            <button data-r="24">All</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="mainChart"></canvas>
+          <div class="tip" id="tip"><b>$0</b><span>—</span></div>
+        </div>
+        <div class="chart-foot">
+          <span>Start <b id="cfStart">—</b></span>
+          <span>Current <b id="cfNow">—</b></span>
+          <span>Change <b id="cfChg" class="up">—</b></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><div><h2>Allocation</h2><p class="ph-sub">By asset class</p></div></div>
+        <div class="donut-wrap">
+          <canvas id="donut"></canvas>
+          <div class="legend">
+            <div class="lg"><i style="background:#c9a96e"></i>Office<b>38%</b></div>
+            <div class="lg"><i style="background:#4ec98a"></i>Industrial<b>27%</b></div>
+            <div class="lg"><i style="background:#68a6d2"></i>Multifamily<b>21%</b></div>
+            <div class="lg"><i style="background:#e06060"></i>Hospitality<b>14%</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HOLDINGS -->
+    <div class="panel" id="holdings">
+      <div class="panel-h"><div><h2>Your holdings</h2><p class="ph-sub">Click a column to sort</p></div></div>
+      <div style="overflow-x:auto">
+      <table id="hTable">
+        <thead><tr>
+          <th data-k="name">Asset<span class="arr">▲</span></th>
+          <th data-k="tokens">Tokens<span class="arr">▲</span></th>
+          <th data-k="value">Value<span class="arr">▲</span></th>
+          <th data-k="yield">Yield<span class="arr">▲</span></th>
+          <th data-k="gain">Gain<span class="arr">▲</span></th>
+          <th>Lock-up</th>
+        </tr></thead>
+        <tbody id="hBody"></tbody>
+      </table>
+      </div>
+    </div>
+
+    <!-- DISTRIBUTIONS — coupon rail -->
+    <div class="panel" id="distributions">
+      <div class="panel-h"><div><h2>Distributions</h2><p class="ph-sub">Quarterly income · auto-paid to your account</p></div></div>
+      <div class="rail">
+        <div class="coupon">
+          <div class="cp-top"><span>Q3 2026</span><span class="cp-status next">UPCOMING</span></div>
+          <p class="cp-amt">$5,310</p>
+          <p class="cp-from">4 properties · est.</p>
+          <p class="cp-date">EXPECTED SEP 30, 2026</p>
+        </div>
+        <div class="coupon">
+          <div class="cp-top"><span>Q2 2026</span><span class="cp-status paid">PAID</span></div>
+          <p class="cp-amt">$5,143</p>
+          <p class="cp-from">4 properties</p>
+          <p class="cp-date">PAID JUN 30, 2026</p>
+        </div>
+        <div class="coupon">
+          <div class="cp-top"><span>Q1 2026</span><span class="cp-status paid">PAID</span></div>
+          <p class="cp-amt">$4,876</p>
+          <p class="cp-from">4 properties</p>
+          <p class="cp-date">PAID MAR 31, 2026</p>
+        </div>
+        <div class="coupon">
+          <div class="cp-top"><span>Q4 2025</span><span class="cp-status paid">PAID</span></div>
+          <p class="cp-amt">$4,612</p>
+          <p class="cp-from">3 properties</p>
+          <p class="cp-date">PAID DEC 31, 2025</p>
+        </div>
+        <div class="coupon">
+          <div class="cp-top"><span>Q3 2025</span><span class="cp-status paid">PAID</span></div>
+          <p class="cp-amt">$3,981</p>
+          <p class="cp-from">3 properties</p>
+          <p class="cp-date">PAID SEP 30, 2025</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDER BOOK + ACTIVITY -->
+    <div class="grid-2" id="market">
+      <div class="panel">
+        <div class="panel-h"><div><h2>Secondary market</h2><p class="ph-sub">One Pacific Tower · NXPT · live order book</p></div></div>
+        <div style="padding:8px 0 14px">
+          <div class="ob-row"><span class="ob-side s">SELL</span><div class="ob-depth s"><i style="width:34%"></i></div><div class="ob-px">$262.00<span>120 tokens</span></div></div>
+          <div class="ob-row"><span class="ob-side s">SELL</span><div class="ob-depth s"><i style="width:52%"></i></div><div class="ob-px">$259.50<span>240 tokens</span></div></div>
+          <div class="ob-row"><span class="ob-side s">SELL</span><div class="ob-depth s"><i style="width:21%"></i></div><div class="ob-px">$257.25<span>85 tokens</span></div></div>
+          <div class="ob-row" style="border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);margin:4px 0"><span style="font-size:10px;color:var(--gold2);letter-spacing:.12em">LAST</span><div></div><div class="ob-px" style="color:var(--gold2)">$255.40<span>▲ +2.2% today</span></div></div>
+          <div class="ob-row"><span class="ob-side b">BUY</span><div class="ob-depth b"><i style="width:46%"></i></div><div class="ob-px">$254.00<span>180 tokens</span></div></div>
+          <div class="ob-row"><span class="ob-side b">BUY</span><div class="ob-depth b"><i style="width:68%"></i></div><div class="ob-px">$252.75<span>320 tokens</span></div></div>
+          <div class="ob-row"><span class="ob-side b">BUY</span><div class="ob-depth b"><i style="width:29%"></i></div><div class="ob-px">$251.00<span>110 tokens</span></div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-h"><div><h2>Recent activity</h2><p class="ph-sub">Last 30 days</p></div></div>
+        <div class="act">
+          <div class="act-row">
+            <div class="act-dot"><svg viewBox="0 0 24 24" style="stroke:var(--green)"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></div>
+            <div class="act-body"><b>Distribution received</b><span>$5,143 from 4 properties</span><span class="t">JUN 30 · 09:00</span></div>
+          </div>
+          <div class="act-row">
+            <div class="act-dot"><svg viewBox="0 0 24 24" style="stroke:var(--gold)"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/></svg></div>
+            <div class="act-body"><b>Buy order filled</b><span>40 NXCW @ $101.20 · Clearwater Industrial</span><span class="t">JUN 18 · 14:32</span></div>
+          </div>
+          <div class="act-row">
+            <div class="act-dot"><svg viewBox="0 0 24 24" style="stroke:var(--blue)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+            <div class="act-body"><b>K-1 available</b><span>Harbor View Apartments · tax year 2025</span><span class="t">JUN 05 · 08:11</span></div>
+          </div>
+          <div class="act-row">
+            <div class="act-dot"><svg viewBox="0 0 24 24" style="stroke:var(--gold2)"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></div>
+            <div class="act-body"><b>Lock-up ending soon</b><span>Meridian Hotel tokens tradeable from JUL 15</span><span class="t">JUN 02 · 12:00</span></div>
+          </div>
+          <div class="act-row">
+            <div class="act-dot"><svg viewBox="0 0 24 24" style="stroke:var(--green)"><polyline points="20 6 9 17 4 12"/></svg></div>
+            <div class="act-body"><b>Vote recorded</b><span>Pacific Tower — capital improvement budget</span><span class="t">MAY 26 · 17:45</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+</div>
+
+<script>
+/* ════════ data ════════ */
+const HOLDINGS=[
+ {c:'#c9a96e',name:'One Pacific Tower',sub:'Office · San Francisco',sym:'NXPT',tokens:420,value:107268,yield:7.8,gain:14.2,lock:100},
+ {c:'#4ec98a',name:'Clearwater Industrial',sub:'Logistics · Dallas',sym:'NXCW',tokens:760,value:76912,yield:9.1,gain:11.6,lock:100},
+ {c:'#68a6d2',name:'Harbor View Apartments',sub:'Multifamily · Seattle',sym:'NXHV',tokens:830,value:60590,yield:6.2,gain:8.4,lock:62},
+ {c:'#e06060',name:'The Meridian Hotel',sub:'Hospitality · Miami',sym:'NXMH',tokens:78,value:39980,yield:6.4,gain:5.1,lock:88},
+];
+
+/* ════════ helpers ════════ */
+const $=s=>document.querySelector(s);
+const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
+const dpr=window.devicePixelRatio||1;
+function fitCanvas(cv){
+  const r=cv.getBoundingClientRect();
+  cv.width=r.width*dpr; cv.height=r.height*dpr;
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  return [ctx,r.width,r.height];
+}
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ════════ count-up KPIs ════════ */
+document.querySelectorAll('[data-count]').forEach(el=>{
+  const target=parseFloat(el.dataset.count), dec=+(el.dataset.dec||0);
+  const pre=el.dataset.pre||'', suf=el.dataset.suf||'';
+  if(reduced){el.textContent=pre+target.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec})+suf;return;}
+  const t0=performance.now(), dur=1100;
+  (function tick(t){
+    const p=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent=pre+(target*e).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec})+suf;
+    if(p<1) requestAnimationFrame(tick);
+  })(t0);
+});
+
+/* ════════ sparklines ════════ */
+document.querySelectorAll('canvas[data-spark]').forEach(cv=>{
+  const [ctx,w,h]=fitCanvas(cv);
+  const d=cv.dataset.spark.split(',').map(Number);
+  const mx=Math.max(...d), mn=Math.min(...d);
+  ctx.strokeStyle=cv.dataset.c; ctx.lineWidth=1.6; ctx.lineJoin='round'; ctx.beginPath();
+  d.forEach((v,i)=>{
+    const x=(i/(d.length-1))*(w-2)+1, y=h-3-((v-mn)/(mx-mn||1))*(h-6);
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.stroke();
+});
+
+/* ════════ main area chart ════════ */
+function series(months){
+  const pts=[], n=months*4; let v=284750/Math.pow(1.0048,n);
+  for(let i=0;i<=n;i++){
+    const wob=Math.sin(i*1.7)*1800+Math.sin(i*0.6)*2600;
+    pts.push(Math.max(150000,v+wob)); v*=1.0048;
+  }
+  pts[pts.length-1]=284750;
+  return pts;
+}
+let chartData=series(12);
+const mc=$('#mainChart'), tip=$('#tip');
+let geom=null;
+
+function drawChart(){
+  const [ctx,w,h]=fitCanvas(mc);
+  const pad={l:8,r:8,t:14,b:20};
+  const d=chartData, mx=Math.max(...d)*1.03, mn=Math.min(...d)*0.97;
+  const X=i=>pad.l+(i/(d.length-1))*(w-pad.l-pad.r);
+  const Y=v=>pad.t+(1-(v-mn)/(mx-mn))*(h-pad.t-pad.b);
+  geom={X,Y,d,w,h};
+  ctx.clearRect(0,0,w,h);
+  // grid
+  ctx.strokeStyle='#171c23'; ctx.lineWidth=1;
+  for(let g=0;g<4;g++){const gy=pad.t+g*(h-pad.t-pad.b)/3;ctx.beginPath();ctx.moveTo(pad.l,gy);ctx.lineTo(w-pad.r,gy);ctx.stroke();}
+  // area
+  const grad=ctx.createLinearGradient(0,pad.t,0,h);
+  grad.addColorStop(0,'rgba(201,169,110,.28)'); grad.addColorStop(1,'rgba(201,169,110,0)');
+  ctx.beginPath(); ctx.moveTo(X(0),Y(d[0]));
+  d.forEach((v,i)=>ctx.lineTo(X(i),Y(v)));
+  ctx.lineTo(X(d.length-1),h-pad.b); ctx.lineTo(X(0),h-pad.b); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+  // line
+  ctx.beginPath(); d.forEach((v,i)=>i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v)));
+  ctx.strokeStyle='#c9a96e'; ctx.lineWidth=2; ctx.lineJoin='round'; ctx.stroke();
+  // end dot
+  ctx.beginPath(); ctx.arc(X(d.length-1),Y(d[d.length-1]),3.6,0,7);
+  ctx.fillStyle='#e0c48a'; ctx.fill();
+  // footer stats
+  $('#cfStart').textContent=fmt(d[0]);
+  $('#cfNow').textContent=fmt(d[d.length-1]);
+  const chg=((d[d.length-1]-d[0])/d[0]*100);
+  const cfc=$('#cfChg'); cfc.textContent=(chg>=0?'+':'')+chg.toFixed(1)+'%';
+  cfc.className=chg>=0?'up':'dn';
+}
+drawChart();
+addEventListener('resize',()=>{drawChart();});
+
+/* hover tooltip + crosshair */
+mc.addEventListener('mousemove',e=>{
+  if(!geom)return;
+  const r=mc.getBoundingClientRect(), x=e.clientX-r.left;
+  const i=Math.round((x-8)/(r.width-16)*(geom.d.length-1));
+  if(i<0||i>=geom.d.length){tip.style.opacity=0;return;}
+  const v=geom.d[i];
+  drawChart();
+  const ctx=mc.getContext('2d');
+  ctx.strokeStyle='rgba(234,230,220,.22)'; ctx.setLineDash([3,4]); ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(geom.X(i),10); ctx.lineTo(geom.X(i),r.height-20); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(geom.X(i),geom.Y(v),4,0,7); ctx.fillStyle='#e0c48a'; ctx.fill();
+  const wk=geom.d.length-1-i;
+  tip.querySelector('b').textContent=fmt(v);
+  tip.querySelector('span').textContent=wk===0?'now':wk+' wk ago';
+  tip.style.left=geom.X(i)+'px'; tip.style.top=geom.Y(v)+'px'; tip.style.opacity=1;
+});
+mc.addEventListener('mouseleave',()=>{tip.style.opacity=0;drawChart();});
+
+/* range buttons */
+$('#rangeSeg').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  $('#rangeSeg .on').classList.remove('on'); b.classList.add('on');
+  chartData=series(+b.dataset.r); drawChart();
+});
+
+/* ════════ donut ════════ */
+(function(){
+  const cv=$('#donut'), [ctx,w,h]=fitCanvas(cv);
+  const cx=w/2, cy=h/2, R=w/2-6, r=R*0.62;
+  const segs=[[38,'#c9a96e'],[27,'#4ec98a'],[21,'#68a6d2'],[14,'#e06060']];
+  let a=-Math.PI/2;
+  segs.forEach(([pct,col])=>{
+    const a2=a+pct/100*Math.PI*2;
+    ctx.beginPath(); ctx.arc(cx,cy,R,a+0.02,a2-0.02); ctx.arc(cx,cy,r,a2-0.02,a+0.02,true);
+    ctx.closePath(); ctx.fillStyle=col; ctx.fill();
+    a=a2;
+  });
+  ctx.fillStyle='#eae6dc'; ctx.font='500 17px "DM Mono"'; ctx.textAlign='center';
+  ctx.fillText('4',cx,cy-2);
+  ctx.fillStyle='#5a5850'; ctx.font='9px Outfit';
+  ctx.fillText('ASSET CLASSES',cx,cy+13);
+})();
+
+/* ════════ holdings table (sortable) ════════ */
+let sortK='value', sortDir=-1;
+function renderTable(){
+  const rows=[...HOLDINGS].sort((a,b)=>{
+    const va=a[sortK],vb=b[sortK];
+    return (typeof va==='string'?va.localeCompare(vb):va-vb)*sortDir;
+  });
+  $('#hBody').innerHTML=rows.map(r=>`
+    <tr>
+      <td><div class="asset"><i style="background:${r.c}"></i><div><b>${r.name}</b><span>${r.sub} · ${r.sym}</span></div></div></td>
+      <td class="mono">${r.tokens.toLocaleString()}</td>
+      <td class="mono">${fmt(r.value)}</td>
+      <td><span class="yield-pill">${r.yield.toFixed(1)}%</span></td>
+      <td class="mono" style="color:var(--green)">+${r.gain.toFixed(1)}%</td>
+      <td>${r.lock>=100
+        ?'<span style="font-family:var(--fm);font-size:11px;color:var(--green)">TRADEABLE</span>'
+        :`<div class="tr-bar" title="${r.lock}% of lock-up elapsed"><i style="width:${r.lock}%"></i></div>`}</td>
+    </tr>`).join('');
+  document.querySelectorAll('#hTable th[data-k]').forEach(th=>{
+    th.classList.toggle('sorted',th.dataset.k===sortK);
+    th.classList.toggle('desc',th.dataset.k===sortK&&sortDir===-1);
+  });
+}
+document.querySelectorAll('#hTable th[data-k]').forEach(th=>th.addEventListener('click',()=>{
+  if(sortK===th.dataset.k) sortDir*=-1; else {sortK=th.dataset.k; sortDir=-1;}
+  renderTable();
+}));
+renderTable();
+
+/* ════════ live offerings (Vesta backend) ════════ */
+// Point this at your running Vesta FastAPI backend.
+const VESTA_API = (window.VESTA_API_URL) || 'http://localhost:8000';
+// Where "Invest" sends people (your investor app deep link or hosted web build).
+const INVEST_URL = (window.VESTA_INVEST_URL) || 'vesta://property';
+
+const compact = n => n==null ? '—'
+  : n>=1e6 ? '$'+(n/1e6).toFixed(2)+'M'
+  : n>=1e3 ? '$'+(n/1e3).toFixed(0)+'K'
+  : '$'+Math.round(n);
+
+function offerCard(o){
+  const p = o.property || {};
+  const loc = [p.city,p.state].filter(Boolean).join(', ');
+  const total = o.sale_tokens || 0;
+  // subscription % is filled from on-chain in the app; here we show target progress if known
+  const subscribed = o.subscribed_pct != null ? o.subscribed_pct : 0;
+  return `
+    <div class="offer-card">
+      <div class="oc-top">
+        <div>
+          <div class="oc-name">${o.name || p.address || 'Offering'}</div>
+          <div class="oc-loc">${loc || '—'} · ${p.property_type || '—'}</div>
+        </div>
+        <span class="oc-yield">${o.projected_yield!=null?o.projected_yield.toFixed(1):'—'}% yield</span>
+      </div>
+      <div class="oc-stats">
+        <div class="oc-stat"><div class="l">Token price</div><div class="v">${o.token_price_usdc!=null?'$'+o.token_price_usdc.toFixed(2):'—'}</div></div>
+        <div class="oc-stat"><div class="l">Target raise</div><div class="v">${compact(o.target_raise_usd)}</div></div>
+        <div class="oc-stat"><div class="l">Valuation</div><div class="v">${compact(p.asking_price)}</div></div>
+      </div>
+      <div class="oc-prog"><span>${subscribed.toFixed(0)}% subscribed</span><span>${total.toLocaleString()} tokens</span></div>
+      <div class="oc-bar"><i style="width:${Math.min(100,subscribed)}%"></i></div>
+      <a class="oc-btn" href="${INVEST_URL}/${o.id}">View &amp; invest →</a>
+    </div>`;
+}
+
+async function loadOfferings(){
+  const grid = document.getElementById('offerGrid');
+  grid.innerHTML = '<div class="offer-empty">Loading offerings…</div>';
+  try{
+    const res = await fetch(`${VESTA_API}/api/offerings/?live_only=true`);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const list = data.offerings || [];
+    if(!list.length){
+      grid.innerHTML = '<div class="offer-empty">No live offerings yet.<span>Publish a deal at the Token Offering stage from the Vesta pipeline.</span></div>';
+      return;
+    }
+    grid.innerHTML = list.map(offerCard).join('');
+  }catch(e){
+    grid.innerHTML = `<div class="offer-empty">Couldn't reach the offerings API at ${VESTA_API}.<span>Set window.VESTA_API_URL or start the backend, then Refresh.</span></div>`;
+  }
+}
+document.getElementById('offRefresh').addEventListener('click',loadOfferings);
+loadOfferings();
+</script>
+</body>
+</html>
