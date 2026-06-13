@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Outfit:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════════
    NEXUS — investor dashboard v2
@@ -243,11 +244,14 @@ tbody tr:last-child td{border-bottom:none}
     <div class="tb-right">
       <label class="tb-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg><input type="text" placeholder="Search assets, documents…" aria-label="Search"/></label>
       <button class="tb-bell" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><i></i></button>
-      <div class="tb-user"><div class="tb-ava">J</div><span>J. Chen ▾</span></div>
+      <div class="tb-user" id="connectBtn" onclick="vestaConnect()"><div class="tb-ava" id="cbAva">↗</div><span id="cbLabel">Connect wallet</span></div>
     </div>
   </div>
 
   <div class="wrap">
+
+    <!-- KYC banner (shown when a connected wallet isn't verified) -->
+    <div id="kycBanner" style="display:none;margin-bottom:22px;padding:14px 18px;border-radius:11px;border:1px solid var(--line);background:var(--gold-dim);font-family:var(--fs);font-size:13.5px;color:var(--cream)"></div>
 
     <!-- KPI ROW -->
     <div class="kpis">
@@ -635,6 +639,7 @@ async function loadOfferings(){
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const list = data.offerings || [];
+    window._vestaOfferings = list; OFFERINGS_CACHE = list;
     if(!list.length){
       grid.innerHTML = '<div class="offer-empty">No live offerings yet.<span>Publish a deal at the Token Offering stage from the Vesta pipeline.</span></div>';
       return;
@@ -645,7 +650,85 @@ async function loadOfferings(){
   }
 }
 document.getElementById('offRefresh').addEventListener('click',loadOfferings);
-loadOfferings();
+
+/* ════════ wallet connect + live portfolio ════════ */
+const CHAIN_RPC = (window.VESTA_CHAIN_RPC) || 'https://sepolia.base.org';
+const ERC20_BAL = ['function balanceOf(address) view returns (uint256)'];
+const VAULT_CLAIM = ['function totalClaimable(address) view returns (uint256)'];
+const PALETTE = ['#c9a96e','#4ec98a','#68a6d2','#e06060','#e0c48a'];
+let CONNECTED = null;
+let OFFERINGS_CACHE = [];
+
+async function vestaConnect(){
+  if(!window.ethereum){ alert('No wallet found. Install MetaMask or a Base-compatible wallet.'); return; }
+  try{
+    const accs = await window.ethereum.request({method:'eth_requestAccounts'});
+    CONNECTED = accs[0];
+    document.getElementById('cbLabel').textContent = CONNECTED.slice(0,6)+'…'+CONNECTED.slice(-4);
+    document.getElementById('cbAva').textContent = '◆';
+    await Promise.all([checkKyc(CONNECTED), loadPortfolio(CONNECTED)]);
+  }catch(e){ console.warn('connect failed', e); }
+}
+
+async function checkKyc(addr){
+  const banner = document.getElementById('kycBanner');
+  try{
+    const r = await fetch(`${VESTA_API}/api/investors/${addr}/status`);
+    const s = await r.json();
+    if(s.can_invest){ banner.style.display='none'; return; }
+    banner.style.display='block';
+    const msg = s.kyc_status==='pending'
+      ? 'Your investor verification is under review by our transfer agent. You\'ll be able to invest once approved.'
+      : s.kyc_status==='rejected'
+      ? 'Your verification was not approved. Please contact support.'
+      : 'Investing requires identity & accreditation verification by our licensed transfer agent.';
+    banner.innerHTML = `◆ ${msg}` + (s.kyc_status==='not_started'||!s.kyc_status
+      ? ` <a href="${INVEST_URL.replace('/property','')}/verify" style="color:var(--gold2);text-decoration:underline">Get verified →</a>` : '');
+  }catch(e){ banner.style.display='none'; }
+}
+
+async function loadPortfolio(addr){
+  if(!ethers || !OFFERINGS_CACHE.length) return;
+  const provider = new ethers.JsonRpcProvider(CHAIN_RPC);
+  const holdings=[]; let totalValue=0, totalClaimable=0, yieldNum=0;
+  for(const o of OFFERINGS_CACHE){
+    try{
+      if(o.contracts && o.contracts.token){
+        const tok = new ethers.Contract(o.contracts.token, ERC20_BAL, provider);
+        const bal = await tok.balanceOf(addr);
+        const tokens = Number(ethers.formatUnits(bal, 18));
+        if(tokens > 0){
+          const value = tokens * (o.token_price_usdc||0);
+          totalValue += value;
+          yieldNum += (o.projected_yield||0) * value;
+          holdings.push({
+            c: PALETTE[holdings.length % PALETTE.length],
+            name: o.name, sub: `${o.property.city||''} · ${o.property.property_type||''}`,
+            sym: o.symbol||'—', tokens, value, yield:o.projected_yield||0, gain:0, lock:100
+          });
+        }
+      }
+      if(o.contracts && o.contracts.distribution_vault){
+        const v = new ethers.Contract(o.contracts.distribution_vault, VAULT_CLAIM, provider);
+        const c = await v.totalClaimable(addr);
+        totalClaimable += Number(ethers.formatUnits(c, 6));
+      }
+    }catch(e){ /* contract not reachable; skip */ }
+  }
+  // Update KPIs (Portfolio value · Income · Blended yield · Properties held)
+  const kv = document.querySelectorAll('.kpi-v');
+  if(kv[0]) kv[0].textContent = '$'+Math.round(totalValue).toLocaleString();
+  if(kv[1]) kv[1].textContent = '$'+Math.round(totalClaimable).toLocaleString();
+  if(kv[2]) kv[2].textContent = (totalValue? (yieldNum/totalValue):0).toFixed(1)+'%';
+  if(kv[3]) kv[3].textContent = String(holdings.length);
+  // Replace holdings table with live data
+  if(holdings.length){
+    HOLDINGS.length = 0; holdings.forEach(h=>HOLDINGS.push(h));
+    renderTable();
+  }
+}
+
+(async()=>{ await loadOfferings(); OFFERINGS_CACHE = window._vestaOfferings || []; })();
 </script>
 </body>
 </html>

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from models.database import init_db
-from api import leads, pipeline, outreach, analytics, offerings
+from api import leads, pipeline, outreach, analytics, offerings, investors
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +36,7 @@ app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"])
 app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(offerings.router, prefix="/api/offerings", tags=["offerings"])
+app.include_router(investors.router, prefix="/api/investors", tags=["investors"])
 
 # Serve built React frontend
 _frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

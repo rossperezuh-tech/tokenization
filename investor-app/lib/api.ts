@@ -52,3 +52,35 @@ export async function fetchOffering(id: number): Promise<Offering> {
   if (!res.ok) throw new Error(`Offering ${id} not found`);
   return (await res.json()) as Offering;
 }
+
+// ── KYC / compliance (driven by the licensed transfer agent) ──────────
+export type KycStatus = {
+  wallet_address: string;
+  kyc_status: "not_started" | "pending" | "approved" | "rejected";
+  can_invest: boolean;
+  full_name?: string;
+};
+
+export async function fetchKycStatus(address: string): Promise<KycStatus> {
+  const res = await fetch(`${BASE}/api/investors/${address}/status`);
+  if (!res.ok) throw new Error(`KYC status request failed: ${res.status}`);
+  return (await res.json()) as KycStatus;
+}
+
+export async function submitKyc(payload: {
+  wallet_address: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  country?: string;
+  accredited: boolean;
+  accreditation_method?: string;
+}): Promise<KycStatus> {
+  const res = await fetch(`${BASE}/api/investors/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`KYC submit failed: ${res.status}`);
+  return (await res.json()) as KycStatus;
+}

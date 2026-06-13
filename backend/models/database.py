@@ -189,6 +189,36 @@ class TokenOffering(Base):
     lead = relationship("Lead")
 
 
+class Investor(Base):
+    """An investor wallet and its KYC/accreditation status. Verification is
+    performed by the licensed transfer agent; this table mirrors that status so
+    the app/website can gate buying. The on-chain ComplianceRegistry remains the
+    hard enforcement point."""
+    __tablename__ = "investors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    wallet_address = Column(String(80), unique=True, index=True, nullable=False)
+
+    full_name = Column(String(200))
+    email = Column(String(200))
+    phone = Column(String(50))
+    country = Column(String(80))
+
+    # Status: pending | approved | rejected
+    kyc_status = Column(String(40), default="pending")
+    accredited = Column(Boolean, default=False)
+    accreditation_method = Column(String(120))   # e.g. "income", "net_worth", "third_party_letter"
+
+    transfer_agent_id = Column(String(120))       # the TA's investor reference
+    lockup_until = Column(DateTime, nullable=True)
+    onchain_whitelisted = Column(Boolean, default=False)
+
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class PriceHistory(Base):
     __tablename__ = "price_history"
 

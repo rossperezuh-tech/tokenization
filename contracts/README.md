@@ -8,10 +8,25 @@ deployed to **Base** (cheap L2 with native USDC).
 
 | Contract | Role |
 |---|---|
-| `PropertyToken.sol` | ERC-20 (with snapshots) representing fractional ownership of one property. |
-| `PropertySale.sol` | Primary sale — investors pay USDC, receive tokens at a fixed price. Optional KYC allowlist. |
+| `ComplianceRegistry.sol` | Investor allowlist + lock-ups, **controlled by your licensed transfer agent**. The hard enforcement point for who may hold/buy. |
+| `PropertyToken.sol` | ERC-20 (with snapshots) representing fractional ownership. Transfers are restricted to whitelisted investors via the registry. |
+| `PropertySale.sol` | Primary sale — investors pay USDC, receive tokens at a fixed price. Buying requires registry approval. |
 | `DistributionVault.sol` | Issuer deposits USDC rent; holders claim pro-rata by snapshot. |
 | `MockUSDC.sol` | 6-decimal test stablecoin for local/testnet. |
+
+## Transfer agent & compliance
+
+Because tokenized real estate is a security, `PropertyToken` is a **restricted
+token**: it calls `ComplianceRegistry.canTransfer(from, to)` on every move, so
+tokens only travel between investors your transfer agent has whitelisted, and
+honors per-investor lock-ups (e.g. the Reg D 506(c) one-year hold).
+
+- The registry has an **`agent`** role — set `AGENT_ADDRESS` at deploy to your
+  transfer agent's controller wallet. They call `setWhitelisted` / `setLockup`
+  as investors clear KYC/accreditation.
+- The backend mirrors KYC status (`/api/investors`) and can optionally push the
+  on-chain whitelist itself if the platform holds the agent key — but typically
+  the transfer agent owns that key and writes directly.
 
 ## Setup
 

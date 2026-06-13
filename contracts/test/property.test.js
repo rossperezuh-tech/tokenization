@@ -2,15 +2,18 @@ const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
 describe("Vesta property offering", function () {
-  let usdc, token, sale, vault, issuer, alice, bob;
+  let usdc, registry, token, sale, vault, issuer, agent, alice, bob;
   const SUPPLY = ethers.parseUnits("100000", 18);      // 100k tokens
   const SALE_INV = ethers.parseUnits("70000", 18);     // 70k for sale
   const PRICE = 32_500000n;                            // $32.50 (6dp) per token
 
   beforeEach(async () => {
-    [issuer, alice, bob] = await ethers.getSigners();
+    [issuer, agent, alice, bob] = await ethers.getSigners();
 
     usdc = await (await ethers.getContractFactory("MockUSDC")).deploy();
+    registry = await (await ethers.getContractFactory("ComplianceRegistry")).deploy(
+      issuer.address, agent.address
+    );
     token = await (await ethers.getContractFactory("PropertyToken")).deploy(
       "182 Atlantic Ave", "VATL", SUPPLY,
       "182 Atlantic Ave, Brooklyn, NY", "Mixed-Use", 3_250_000n, issuer.address
@@ -24,6 +27,12 @@ describe("Vesta property offering", function () {
 
     await token.setSaleContract(await sale.getAddress());
     await token.setDistributionVault(await vault.getAddress());
+    await token.setRegistry(await registry.getAddress());
+    await sale.setRegistry(await registry.getAddress());
+
+    // transfer agent whitelists issuer + sale so inventory can move
+    await registry.connect(agent).setWhitelisted(issuer.address, true);
+    await registry.connect(agent).setWhitelisted(await sale.getAddress(), true);
     await token.transfer(await sale.getAddress(), SALE_INV);
 
     // fund investors with USDC
@@ -31,7 +40,13 @@ describe("Vesta property offering", function () {
     await usdc.mint(bob.address, 1_000_000n * 1_000000n);
   });
 
+  async function approveInvestors() {
+    await registry.connect(agent).setWhitelisted(alice.address, true);
+    await registry.connect(agent).setWhitelisted(bob.address, true);
+  }
+
   it("sells tokens for USDC at the set price", async () => {
+    await approveInvestors();
     const amount = ethers.parseUnits("100", 18); // buy 100 tokens
     const cost = await sale.cost(amount);
     expect(cost).to.equal(100n * PRICE); // 100 * $32.50 = $3,250
@@ -44,20 +59,48 @@ describe("Vesta property offering", function () {
     expect(await sale.totalRaised()).to.equal(cost);
   });
 
-  it("enforces KYC when required", async () => {
-    await sale.setKycRequired(true);
+  it("only lets transfer-agent-approved investors buy", async () => {
     const amount = ethers.parseUnits("10", 18);
     const cost = await sale.cost(amount);
     await usdc.connect(alice).approve(await sale.getAddress(), cost);
 
-    await expect(sale.connect(alice).buy(amount)).to.be.revertedWith("PropertySale: KYC required");
+    // not whitelisted yet
+    await expect(sale.connect(alice).buy(amount)).to.be.revertedWith(
+      "PropertySale: investor not KYC-approved"
+    );
 
-    await sale.setKyc(alice.address, true);
+    // transfer agent approves alice
+    await registry.connect(agent).setWhitelisted(alice.address, true);
     await sale.connect(alice).buy(amount);
     expect(await token.balanceOf(alice.address)).to.equal(amount);
   });
 
+  it("restricts secondary transfers to whitelisted holders and honors lock-ups", async () => {
+    await approveInvestors();
+    const amount = ethers.parseUnits("50", 18);
+    await usdc.connect(alice).approve(await sale.getAddress(), await sale.cost(amount));
+    await sale.connect(alice).buy(amount);
+
+    const [, , , , carol] = await ethers.getSigners();
+    // carol not whitelisted -> transfer blocked
+    await expect(
+      token.connect(alice).transfer(carol.address, amount)
+    ).to.be.revertedWith("PropertyToken: transfer not permitted by compliance");
+
+    // bob is whitelisted -> transfer allowed
+    await token.connect(alice).transfer(bob.address, amount);
+    expect(await token.balanceOf(bob.address)).to.equal(amount);
+
+    // lock bob up -> bob can't send onward until it expires
+    const future = Math.floor(Date.now() / 1000) + 3600;
+    await registry.connect(agent).setLockup(bob.address, future);
+    await expect(
+      token.connect(bob).transfer(alice.address, amount)
+    ).to.be.revertedWith("PropertyToken: transfer not permitted by compliance");
+  });
+
   it("distributes rental income pro-rata via snapshots", async () => {
+    await approveInvestors();
     // Alice buys 300, Bob buys 100 => 75% / 25% of the 400 circulating
     const aliceAmt = ethers.parseUnits("300", 18);
     const bobAmt = ethers.parseUnits("100", 18);
@@ -86,6 +129,7 @@ describe("Vesta property offering", function () {
   });
 
   it("blocks buying more than the sale inventory", async () => {
+    await approveInvestors();
     const tooMuch = SALE_INV + ethers.parseUnits("1", 18);
     const cost = await sale.cost(tooMuch);
     await usdc.connect(alice).approve(await sale.getAddress(), cost);

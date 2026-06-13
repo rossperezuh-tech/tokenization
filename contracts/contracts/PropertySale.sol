@@ -6,6 +6,10 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
+interface IComplianceRegistryView {
+    function isWhitelisted(address investor) external view returns (bool);
+}
+
 /**
  * @title PropertySale
  * @notice Primary sale for a PropertyToken. Investors pay USDC and receive
@@ -30,6 +34,10 @@ contract PropertySale is Ownable, ReentrancyGuard {
     bool public kycRequired;
     mapping(address => bool) public kycApproved;
 
+    /// @notice Transfer-agent registry. When set, it is the source of truth for
+    ///         who may buy (the manual kycApproved map is only a fallback).
+    IComplianceRegistryView public registry;
+
     event Purchased(address indexed buyer, uint256 tokenAmount, uint256 costUsdc);
     event KycSet(address indexed investor, bool approved);
 
@@ -52,6 +60,17 @@ contract PropertySale is Ownable, ReentrancyGuard {
 
     function setKycRequired(bool required_) external onlyOwner {
         kycRequired = required_;
+    }
+
+    /// @notice Point the sale at the transfer-agent compliance registry.
+    function setRegistry(address registry_) external onlyOwner {
+        registry = IComplianceRegistryView(registry_);
+    }
+
+    /// @notice Whether `investor` is approved to buy.
+    function isApproved(address investor) public view returns (bool) {
+        if (address(registry) != address(0)) return registry.isWhitelisted(investor);
+        return !kycRequired || kycApproved[investor];
     }
 
     function setKyc(address investor_, bool approved_) external onlyOwner {
@@ -83,7 +102,7 @@ contract PropertySale is Ownable, ReentrancyGuard {
      * @dev Caller must approve this contract to spend `cost(tokenAmount)` USDC first.
      */
     function buy(uint256 tokenAmount) external nonReentrant {
-        require(!kycRequired || kycApproved[msg.sender], "PropertySale: KYC required");
+        require(isApproved(msg.sender), "PropertySale: investor not KYC-approved");
         require(tokenAmount > 0, "PropertySale: zero amount");
 
         uint256 c = cost(tokenAmount);

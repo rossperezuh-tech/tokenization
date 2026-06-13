@@ -40,9 +40,18 @@ async function main() {
     console.log("Using existing USDC:", usdcAddress);
   }
 
+  // 2. ComplianceRegistry — controlled by your licensed transfer agent.
+  //    AGENT_ADDRESS defaults to the deployer; set it to your TA's wallet.
+  const agent = process.env.AGENT_ADDRESS || issuer.address;
+  const ComplianceRegistry = await hre.ethers.getContractFactory("ComplianceRegistry");
+  const registry = await ComplianceRegistry.deploy(issuer.address, agent);
+  await registry.waitForDeployment();
+  const registryAddress = await registry.getAddress();
+  console.log("ComplianceRegistry deployed:", registryAddress, "(agent:", agent + ")");
+
   const supply = OFFERING.totalTokens * 10n ** 18n;
 
-  // 2. PropertyToken
+  // 3. PropertyToken
   const PropertyToken = await hre.ethers.getContractFactory("PropertyToken");
   const token = await PropertyToken.deploy(
     OFFERING.name, OFFERING.symbol, supply,
@@ -69,9 +78,17 @@ async function main() {
   const vaultAddress = await vault.getAddress();
   console.log("DistributionVault deployed:", vaultAddress);
 
-  // 5. Wire everything
+  // 6. Wire everything
   await (await token.setSaleContract(saleAddress)).wait();
   await (await token.setDistributionVault(vaultAddress)).wait();
+  await (await token.setRegistry(registryAddress)).wait();
+  await (await sale.setRegistry(registryAddress)).wait();
+
+  // Whitelist the issuer + sale so initial inventory can move. (Investors get
+  // whitelisted by the transfer agent as they pass KYC.)
+  await (await registry.setWhitelisted(issuer.address, true)).wait();
+  await (await registry.setWhitelisted(saleAddress, true)).wait();
+
   const inventory = OFFERING.saleInventoryTokens * 10n ** 18n;
   await (await token.transfer(saleAddress, inventory)).wait();
   console.log(`Loaded ${OFFERING.saleInventoryTokens} tokens into the sale.`);
@@ -80,6 +97,8 @@ async function main() {
   console.log(JSON.stringify({
     network: hre.network.name,
     usdc: usdcAddress,
+    complianceRegistry: registryAddress,
+    transferAgent: agent,
     propertyToken: tokenAddress,
     propertySale: saleAddress,
     distributionVault: vaultAddress,

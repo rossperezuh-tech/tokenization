@@ -9,3 +9,4 @@ resend==2.4.0
 twilio==9.3.7
 pydantic==2.10.3
 pydantic-settings==2.6.1
+web3==7.6.0
