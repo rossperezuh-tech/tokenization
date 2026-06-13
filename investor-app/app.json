@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Vesta Invest",
+    "slug": "vesta-investor-app",
+    "scheme": "vesta",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#07080a",
+      "resizeMode": "contain"
+    },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.vesta.invest" },
+    "android": {
+      "package": "com.vesta.invest",
+      "adaptiveIcon": { "backgroundColor": "#07080a" }
+    },
+    "web": { "bundler": "metro", "output": "single" },
+    "plugins": ["expo-router", "expo-secure-store", "expo-font"],
+    "experiments": { "typedRoutes": true }
+  }
+}

@@ -152,6 +152,43 @@ class Pipeline(Base):
     lead = relationship("Lead", back_populates="pipeline_record")
 
 
+class TokenOffering(Base):
+    """An on-chain offering created for a pipeline deal that reached the
+    Token Offering stage. Links a Lead to its deployed contracts so the
+    investor app can show live offerings sourced from the Vesta pipeline."""
+    __tablename__ = "token_offerings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, ForeignKey("leads.id"), unique=True, nullable=False)
+
+    # Marketing
+    name = Column(String(200))
+    symbol = Column(String(20))
+    summary = Column(Text)
+    image_url = Column(String(500))
+
+    # Token economics
+    chain = Column(String(40), default="base")             # base | base-sepolia
+    token_address = Column(String(80))
+    sale_address = Column(String(80))
+    distribution_vault_address = Column(String(80))
+    usdc_address = Column(String(80))
+
+    total_tokens = Column(Float)            # whole tokens offered
+    sale_tokens = Column(Float)             # tokens available to investors
+    token_price_usdc = Column(Float)        # price per token in USD
+    target_raise_usd = Column(Float)
+    projected_yield = Column(Float)         # annual %, for display
+
+    status = Column(String(40), default="open")  # open | funded | closed
+    is_live = Column(Boolean, default=False)      # visible in investor app
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    lead = relationship("Lead")
+
+
 class PriceHistory(Base):
     __tablename__ = "price_history"
 

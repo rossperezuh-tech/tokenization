@@ -1,0 +1,182 @@
+import React, { useEffect, useState } from "react";
+import { View, ScrollView, TextInput, StyleSheet, Text, ActivityIndicator, Alert } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
+import { useActiveAccount, useReadContract, useSendTransaction } from "thirdweb/react";
+import { prepareContractCall, sendTransaction } from "thirdweb";
+import { fetchOffering, type Offering } from "../../lib/api";
+import { saleContract, usdcContract } from "../../lib/contracts";
+import { USDC_ADDRESS } from "../../lib/thirdweb";
+import { Card, H2, Label, Mono, Body, Pill, GoldButton, Progress } from "../../components/ui";
+import { ConnectBar } from "../../components/ConnectBar";
+import { colors, font } from "../../constants/theme";
+import { usd, usdCompact, pct, fromTokens, toTokens, toUsdc } from "../../lib/format";
+
+export default function PropertyDetail() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const account = useActiveAccount();
+  const [offering, setOffering] = useState<Offering | null>(null);
+  const [qty, setQty] = useState("10");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    fetchOffering(Number(id)).then(setOffering).catch(() => setOffering(null));
+  }, [id]);
+
+  const saleAddr = offering?.contracts.sale ?? undefined;
+  const contract = saleAddr ? saleContract(saleAddr) : undefined;
+
+  const { data: sold } = useReadContract({
+    contract: contract!,
+    method: "function tokensSold() view returns (uint256)",
+    queryOptions: { enabled: !!contract },
+  });
+
+  if (!offering) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ActivityIndicator color={colors.gold} style={{ marginTop: 80 }} />
+      </SafeAreaView>
+    );
+  }
+
+  const p = offering.property;
+  const price = offering.token_price_usdc ?? 0;
+  const tokens = Math.max(0, parseInt(qty || "0", 10) || 0);
+  const cost = tokens * price;
+  const soldNum = sold ? fromTokens(sold as bigint) : 0;
+  const total = offering.sale_tokens ?? 0;
+  const raisePct = total > 0 ? (soldNum / total) * 100 : 0;
+
+  async function handleBuy() {
+    if (!account) {
+      Alert.alert("Connect first", "Sign in to invest before buying tokens.");
+      return;
+    }
+    if (!contract || !saleAddr || !USDC_ADDRESS) {
+      Alert.alert("Not available", "This offering isn't fully on-chain yet.");
+      return;
+    }
+    if (tokens <= 0) return;
+
+    try {
+      setBusy(true);
+      const usdc = usdcContract(USDC_ADDRESS);
+
+      // 1) Approve USDC for the sale contract
+      const approveTx = prepareContractCall({
+        contract: usdc,
+        method: "function approve(address spender, uint256 amount) returns (bool)",
+        params: [saleAddr, toUsdc(cost)],
+      });
+      await sendTransaction({ transaction: approveTx, account });
+
+      // 2) Buy tokens
+      const buyTx = prepareContractCall({
+        contract,
+        method: "function buy(uint256 tokenAmount)",
+        params: [toTokens(tokens)],
+      });
+      await sendTransaction({ transaction: buyTx, account });
+
+      Alert.alert("Purchase complete", `You bought ${tokens} ${offering.symbol ?? "tokens"}.`);
+    } catch (e: any) {
+      Alert.alert("Transaction failed", e?.message ?? "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safe} edges={["bottom"]}>
+      <ConnectBar />
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.hero}>{offering.name}</Text>
+        <Label style={{ marginTop: 6 }}>
+          {[p.city, p.state].filter(Boolean).join(", ")} · {p.property_type ?? "—"}
+        </Label>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+          <Pill tone="green">{pct(offering.projected_yield)} projected yield</Pill>
+          {p.cap_rate ? <Pill tone="muted">{pct(p.cap_rate)} cap rate</Pill> : null}
+        </View>
+
+        {offering.summary ? <Body style={{ marginTop: 18 }}>{offering.summary}</Body> : null}
+
+        {/* Key facts */}
+        <Card style={{ marginTop: 18 }}>
+          <Fact label="Token price" value={usd(price, 2)} />
+          <Fact label="Tokens offered" value={total.toLocaleString()} />
+          <Fact label="Target raise" value={usdCompact(offering.target_raise_usd)} />
+          <Fact label="Property valuation" value={usdCompact(p.asking_price)} />
+          {p.sqft ? <Fact label="Size" value={`${p.sqft.toLocaleString()} sqft`} /> : null}
+          <View style={{ marginTop: 12 }}>
+            <View style={styles.row}>
+              <Label>{raisePct.toFixed(0)}% subscribed</Label>
+              <Mono style={{ fontSize: 11, color: colors.mid }}>
+                {soldNum.toLocaleString()} / {total.toLocaleString()}
+              </Mono>
+            </View>
+            <Progress value={raisePct} />
+          </View>
+        </Card>
+
+        {/* Buy ticket */}
+        <Card style={{ marginTop: 18 }}>
+          <H2>Invest</H2>
+          <Label style={{ marginTop: 10 }}>Number of tokens</Label>
+          <TextInput
+            value={qty}
+            onChangeText={setQty}
+            keyboardType="number-pad"
+            style={styles.input}
+            placeholder="10"
+            placeholderTextColor={colors.mut}
+          />
+          <View style={[styles.row, { marginTop: 16, marginBottom: 16 }]}>
+            <Label>Total cost</Label>
+            <Mono style={{ fontSize: 22 }}>{usd(cost, 2)}</Mono>
+          </View>
+          {busy ? (
+            <ActivityIndicator color={colors.gold} />
+          ) : (
+            <GoldButton
+              label={account ? `Buy ${tokens} tokens` : "Sign in to invest"}
+              onPress={handleBuy}
+              disabled={tokens <= 0}
+            />
+          )}
+          <Label style={{ marginTop: 12, textAlign: "center" }}>
+            Paid in USDC on {offering.chain}. Two steps: approve, then buy.
+          </Label>
+        </Card>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={[styles.row, { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.line2 }]}>
+      <Label>{label}</Label>
+      <Mono style={{ fontSize: 14 }}>{value}</Mono>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.bg },
+  content: { padding: 16, paddingBottom: 48 },
+  hero: { color: colors.cream, fontFamily: font.displayItalic, fontStyle: "italic", fontSize: 30 },
+  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  input: {
+    backgroundColor: colors.s2,
+    borderColor: colors.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    color: colors.cream,
+    fontFamily: font.mono,
+    fontSize: 20,
+    padding: 14,
+    marginTop: 6,
+  },
+});
