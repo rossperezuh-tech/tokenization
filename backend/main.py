@@ -7,14 +7,15 @@ import logging
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 load_dotenv()
 
 from models.database import init_db
-from api import leads, pipeline, outreach, analytics, offerings, investors
+from api import leads, pipeline, outreach, analytics, offerings, investors, auth
+from services.auth import require_operator
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,12 +32,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(leads.router, prefix="/api/leads", tags=["leads"])
-app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"])
-app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"])
+# Public: operator login + investor-facing catalogue / KYC (protected per-endpoint inside)
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(offerings.router, prefix="/api/offerings", tags=["offerings"])
 app.include_router(investors.router, prefix="/api/investors", tags=["investors"])
+
+# Operator-only: entire routers gated behind a valid operator token
+_op = [Depends(require_operator)]
+app.include_router(leads.router, prefix="/api/leads", tags=["leads"], dependencies=_op)
+app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"], dependencies=_op)
+app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"], dependencies=_op)
+app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"], dependencies=_op)
 
 # Serve built React frontend
 _frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

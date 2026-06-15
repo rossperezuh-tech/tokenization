@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from models.database import Investor, get_db
 from services.onchain import set_whitelisted
+from services.auth import require_operator
 
 router = APIRouter()
 
@@ -136,7 +137,7 @@ def approve_investor(
     return {**result, "investor": _fmt(inv)}
 
 
-@router.get("/")
+@router.get("/", dependencies=[Depends(require_operator)])
 def list_investors(status: Optional[str] = None, db: Session = Depends(get_db)):
     """Ops view: list investors, optionally filtered by KYC status."""
     q = db.query(Investor)

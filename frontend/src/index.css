@@ -26,6 +26,7 @@
   .badge-cold  { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-green-900/60 text-green-300; }
   .badge-inbound  { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-vesta-900/60 text-vesta-100; }
   .badge-outbound { @apply inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-700 text-gray-200; }
+  .inp { @apply w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-vesta-500; }
 }
 
 /* Leaflet overrides */

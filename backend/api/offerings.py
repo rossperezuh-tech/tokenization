@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from models.database import Lead, Pipeline, PipelineStage, TokenOffering, get_db
+from services.auth import require_operator
 
 router = APIRouter()
 
@@ -99,7 +100,7 @@ def list_offerings(live_only: bool = True, db: Session = Depends(get_db)):
     return {"offerings": [_fmt(o) for o in q.order_by(TokenOffering.created_at.desc()).all()]}
 
 
-@router.get("/candidates")
+@router.get("/candidates", dependencies=[Depends(require_operator)])
 def offering_candidates(db: Session = Depends(get_db)):
     """Pipeline deals at the Token Offering stage that aren't published yet."""
     rows = (
@@ -130,7 +131,7 @@ def get_offering(offering_id: int, db: Session = Depends(get_db)):
     return _fmt(o)
 
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(require_operator)])
 def create_offering(body: OfferingCreate, db: Session = Depends(get_db)):
     lead = db.query(Lead).filter(Lead.id == body.lead_id).first()
     if not lead:
@@ -166,7 +167,66 @@ def create_offering(body: OfferingCreate, db: Session = Depends(get_db)):
     return _fmt(o)
 
 
-@router.patch("/{offering_id}")
+class DeployConfig(BaseModel):
+    lead_id: int
+    symbol: str
+    total_tokens: int = 100_000
+    sale_tokens: int = 70_000
+    token_price_usd: float = 25.0
+    network: str = "baseSepolia"      # testnet by default — NOT live
+    agent_address: Optional[str] = None
+
+
+@router.post("/deploy-config", dependencies=[Depends(require_operator)])
+def deploy_config(body: DeployConfig, db: Session = Depends(get_db)):
+    """Generate the exact contract-deploy parameters + command for an offering.
+
+    The operator runs the printed command on a machine with the deploy wallet;
+    on testnet this is a safe dry run. (Real-money mainnet deploys wait until the
+    LLC / legal structure is in place.)"""
+    lead = db.query(Lead).filter(Lead.id == body.lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    price_usdc_6dp = int(round(body.token_price_usd * 1_000_000))
+    target_raise = body.sale_tokens * body.token_price_usd
+    full_address = ", ".join(
+        filter(None, [lead.address, lead.city, lead.state, lead.zip_code])
+    )
+
+    env = {
+        "PROP_NAME": lead.address or body.symbol,
+        "PROP_SYMBOL": body.symbol,
+        "PROP_TOTAL_TOKENS": str(body.total_tokens),
+        "PROP_SALE_TOKENS": str(body.sale_tokens),
+        "PROP_ADDRESS": full_address,
+        "PROP_TYPE": lead.property_type or "Commercial",
+        "PROP_VALUATION_USD": str(int(lead.asking_price or target_raise)),
+        "PROP_PRICE_USDC": str(price_usdc_6dp),
+    }
+    if body.agent_address:
+        env["AGENT_ADDRESS"] = body.agent_address
+
+    env_block = "\n".join(f"{k}={v}" for k, v in env.items())
+    command = f"cd contracts && npm run deploy:{body.network}"
+
+    return {
+        "lead_id": body.lead_id,
+        "network": body.network,
+        "is_testnet": body.network != "base",
+        "computed": {
+            "token_price_usd": body.token_price_usd,
+            "token_price_usdc_6dp": price_usdc_6dp,
+            "target_raise_usd": target_raise,
+        },
+        "env": env,
+        "env_block": env_block,
+        "command": command,
+        "next_step": "Run the command, then POST the printed addresses to /api/offerings to publish.",
+    }
+
+
+@router.patch("/{offering_id}", dependencies=[Depends(require_operator)])
 def update_offering(offering_id: int, body: OfferingUpdate, db: Session = Depends(get_db)):
     o = db.query(TokenOffering).filter(TokenOffering.id == offering_id).first()
     if not o:
