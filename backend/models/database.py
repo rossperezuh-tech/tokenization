@@ -219,6 +219,58 @@ class Investor(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Document(Base):
+    """Data-room document. Two scopes:
+      - "offering": deal docs (PPM, operating agreement, appraisal) visible to
+        investors on the offering page
+      - "investor": per-investor docs (K-1s, countersigned subscription
+        agreements) delivered via an unguessable download token
+    """
+    __tablename__ = "documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    offering_id = Column(Integer, ForeignKey("token_offerings.id"), nullable=True)
+    investor_wallet = Column(String(80), nullable=True, index=True)
+
+    scope = Column(String(20), default="offering")   # offering | investor
+    title = Column(String(300), nullable=False)
+    doc_type = Column(String(60))                    # ppm | operating_agreement | appraisal | k1 | subscription | other
+    filename = Column(String(300))
+    content_type = Column(String(120))
+    file_path = Column(String(500))                  # on-disk path
+    sha256 = Column(String(64))
+    download_token = Column(String(64), unique=True, index=True)  # capability URL
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Subscription(Base):
+    """A signed subscription agreement (clickwrap e-sign). The investor signs
+    the generated agreement text; we store the exact document hash they signed,
+    their typed signature, and timestamps. The operator countersigns to accept."""
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    offering_id = Column(Integer, ForeignKey("token_offerings.id"), nullable=False)
+    wallet_address = Column(String(80), index=True, nullable=False)
+
+    investor_name = Column(String(200))
+    investor_email = Column(String(200))
+    token_amount = Column(Float)
+    usd_amount = Column(Float)
+
+    agreement_sha256 = Column(String(64))    # hash of the exact text signed
+    signature_name = Column(String(200))     # typed legal name
+    consent = Column(Boolean, default=False)
+
+    status = Column(String(30), default="signed")  # signed | countersigned | cancelled
+    signed_at = Column(DateTime, default=datetime.utcnow)
+    countersigned_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    offering = relationship("TokenOffering")
+
+
 class PriceHistory(Base):
     __tablename__ = "price_history"
 

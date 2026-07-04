@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 load_dotenv()
 
 from models.database import init_db
-from api import leads, pipeline, outreach, analytics, offerings, investors, auth
+from api import leads, pipeline, outreach, analytics, offerings, investors, auth, documents, subscriptions
 from services.auth import require_operator
 
 logging.basicConfig(
@@ -36,6 +36,8 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(offerings.router, prefix="/api/offerings", tags=["offerings"])
 app.include_router(investors.router, prefix="/api/investors", tags=["investors"])
+app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
+app.include_router(subscriptions.router, prefix="/api/subscriptions", tags=["subscriptions"])
 
 # Operator-only: entire routers gated behind a valid operator token
 _op = [Depends(require_operator)]

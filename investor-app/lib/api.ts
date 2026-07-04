@@ -67,6 +67,77 @@ export async function fetchKycStatus(address: string): Promise<KycStatus> {
   return (await res.json()) as KycStatus;
 }
 
+// ── data room ─────────────────────────────────────────────────────────
+export type DataRoomDoc = {
+  id: number;
+  title: string;
+  doc_type: string;
+  filename: string;
+  download_url: string;
+};
+
+export async function fetchOfferingDocuments(offeringId: number): Promise<DataRoomDoc[]> {
+  const res = await fetch(`${BASE}/api/documents/offering/${offeringId}`);
+  if (!res.ok) return [];
+  return (await res.json()).documents as DataRoomDoc[];
+}
+
+export async function fetchInvestorDocuments(address: string): Promise<DataRoomDoc[]> {
+  const res = await fetch(`${BASE}/api/documents/investor/${address}`);
+  if (!res.ok) return [];
+  return (await res.json()).documents as DataRoomDoc[];
+}
+
+export function documentUrl(doc: DataRoomDoc): string {
+  return `${BASE}${doc.download_url}`;
+}
+
+// ── subscription e-sign ───────────────────────────────────────────────
+export type AgreementPreview = { text: string; sha256: string; usd_amount: number };
+
+export async function fetchAgreement(
+  offeringId: number,
+  wallet: string,
+  name: string,
+  tokens: number
+): Promise<AgreementPreview> {
+  const params = new URLSearchParams({ wallet, name, tokens: String(tokens) });
+  const res = await fetch(`${BASE}/api/subscriptions/agreement/${offeringId}?${params}`);
+  if (!res.ok) throw new Error(`Agreement preview failed: ${res.status}`);
+  return (await res.json()) as AgreementPreview;
+}
+
+export async function signSubscription(payload: {
+  offering_id: number;
+  wallet_address: string;
+  investor_name: string;
+  investor_email?: string;
+  token_amount: number;
+  signature_name: string;
+  consent: boolean;
+  agreement_sha256: string;
+}) {
+  const res = await fetch(`${BASE}/api/subscriptions/sign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null))?.detail;
+    throw new Error(detail ?? `Sign failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchSubscriptionStatus(
+  offeringId: number,
+  wallet: string
+): Promise<{ signed: boolean }> {
+  const res = await fetch(`${BASE}/api/subscriptions/status/${offeringId}/${wallet}`);
+  if (!res.ok) return { signed: false };
+  return (await res.json()) as { signed: boolean };
+}
+
 export async function submitKyc(payload: {
   wallet_address: string;
   full_name: string;
