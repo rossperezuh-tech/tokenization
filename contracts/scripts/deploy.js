@@ -78,16 +78,26 @@ async function main() {
   const vaultAddress = await vault.getAddress();
   console.log("DistributionVault deployed:", vaultAddress);
 
-  // 6. Wire everything
+  // 6. SecondaryMarket — P2P order book for the token
+  const SecondaryMarket = await hre.ethers.getContractFactory("SecondaryMarket");
+  const market = await SecondaryMarket.deploy(
+    tokenAddress, usdcAddress, registryAddress, issuer.address
+  );
+  await market.waitForDeployment();
+  const marketAddress = await market.getAddress();
+  console.log("SecondaryMarket deployed:", marketAddress);
+
+  // 7. Wire everything
   await (await token.setSaleContract(saleAddress)).wait();
   await (await token.setDistributionVault(vaultAddress)).wait();
   await (await token.setRegistry(registryAddress)).wait();
   await (await sale.setRegistry(registryAddress)).wait();
 
-  // Whitelist the issuer + sale so initial inventory can move. (Investors get
-  // whitelisted by the transfer agent as they pass KYC.)
+  // Whitelist the issuer + sale + market so inventory and escrow can move.
+  // (Investors get whitelisted by the transfer agent as they pass KYC.)
   await (await registry.setWhitelisted(issuer.address, true)).wait();
   await (await registry.setWhitelisted(saleAddress, true)).wait();
+  await (await registry.setWhitelisted(marketAddress, true)).wait();
 
   const inventory = OFFERING.saleInventoryTokens * 10n ** 18n;
   await (await token.transfer(saleAddress, inventory)).wait();
@@ -102,6 +112,7 @@ async function main() {
     propertyToken: tokenAddress,
     propertySale: saleAddress,
     distributionVault: vaultAddress,
+    secondaryMarket: marketAddress,
     pricePerTokenUsdc: OFFERING.pricePerTokenUsdc.toString(),
     name: OFFERING.name,
     symbol: OFFERING.symbol,

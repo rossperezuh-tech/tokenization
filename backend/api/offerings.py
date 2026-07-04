@@ -30,6 +30,7 @@ class OfferingCreate(BaseModel):
     token_address: Optional[str] = None
     sale_address: Optional[str] = None
     distribution_vault_address: Optional[str] = None
+    secondary_market_address: Optional[str] = None
     usdc_address: Optional[str] = None
     total_tokens: Optional[float] = None
     sale_tokens: Optional[float] = None
@@ -45,6 +46,7 @@ class OfferingUpdate(BaseModel):
     token_address: Optional[str] = None
     sale_address: Optional[str] = None
     distribution_vault_address: Optional[str] = None
+    secondary_market_address: Optional[str] = None
     usdc_address: Optional[str] = None
     token_price_usdc: Optional[float] = None
     projected_yield: Optional[float] = None
@@ -66,6 +68,7 @@ def _fmt(o: TokenOffering) -> dict:
             "token": o.token_address,
             "sale": o.sale_address,
             "distribution_vault": o.distribution_vault_address,
+            "secondary_market": o.secondary_market_address,
             "usdc": o.usdc_address,
         },
         "total_tokens": o.total_tokens,
@@ -153,6 +156,7 @@ def create_offering(body: OfferingCreate, db: Session = Depends(get_db)):
         token_address=body.token_address,
         sale_address=body.sale_address,
         distribution_vault_address=body.distribution_vault_address,
+        secondary_market_address=body.secondary_market_address,
         usdc_address=body.usdc_address,
         total_tokens=body.total_tokens,
         sale_tokens=body.sale_tokens,

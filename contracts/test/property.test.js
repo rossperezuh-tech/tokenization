@@ -128,6 +128,51 @@ describe("Vesta property offering", function () {
     await expect(vault.connect(alice).claim(0)).to.be.revertedWith("DistributionVault: nothing to claim");
   });
 
+  it("secondary market: list, partial fill with fee, cancel, KYC gates", async () => {
+    await approveInvestors();
+    const market = await (await ethers.getContractFactory("SecondaryMarket")).deploy(
+      await token.getAddress(), await usdc.getAddress(),
+      await registry.getAddress(), issuer.address
+    );
+    const marketAddr = await market.getAddress();
+    await registry.connect(agent).setWhitelisted(marketAddr, true);
+    await market.setFee(50, issuer.address); // 0.50%
+
+    // Alice buys 200 on primary, then lists 100 at $40
+    const bought = ethers.parseUnits("200", 18);
+    await usdc.connect(alice).approve(await sale.getAddress(), await sale.cost(bought));
+    await sale.connect(alice).buy(bought);
+
+    const listAmt = ethers.parseUnits("100", 18);
+    const askPrice = 40_000000n; // $40.00
+    await token.connect(alice).approve(marketAddr, listAmt);
+    await market.connect(alice).list(listAmt, askPrice);
+    expect(await token.balanceOf(marketAddr)).to.equal(listAmt); // escrowed
+
+    // Bob partially fills 60 tokens: $2,400 gross, $12 fee (0.5%)
+    const fillAmt = ethers.parseUnits("60", 18);
+    const gross = 60n * askPrice;
+    const fee = (gross * 50n) / 10_000n;
+    await usdc.connect(bob).approve(marketAddr, gross);
+    const sellerBefore = await usdc.balanceOf(alice.address);
+    await market.connect(bob).fill(0, fillAmt);
+    expect(await token.balanceOf(bob.address)).to.equal(fillAmt);
+    expect((await usdc.balanceOf(alice.address)) - sellerBefore).to.equal(gross - fee);
+
+    // Non-whitelisted buyer is blocked
+    const [, , , , mallory] = await ethers.getSigners();
+    await usdc.mint(mallory.address, 1_000_000n * 1_000000n);
+    await usdc.connect(mallory).approve(marketAddr, gross);
+    await expect(market.connect(mallory).fill(0, ethers.parseUnits("1", 18)))
+      .to.be.revertedWith("SecondaryMarket: buyer not KYC-approved");
+
+    // Alice cancels the remaining 40 and gets them back
+    const aliceTokBefore = await token.balanceOf(alice.address);
+    await market.connect(alice).cancel(0);
+    expect((await token.balanceOf(alice.address)) - aliceTokBefore)
+      .to.equal(ethers.parseUnits("40", 18));
+  });
+
   it("blocks buying more than the sale inventory", async () => {
     await approveInvestors();
     const tooMuch = SALE_INV + ethers.parseUnits("1", 18);

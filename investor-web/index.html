@@ -383,8 +383,8 @@ tbody tr:last-child td{border-bottom:none}
     <!-- ORDER BOOK + ACTIVITY -->
     <div class="grid-2" id="market">
       <div class="panel">
-        <div class="panel-h"><div><h2>Secondary market</h2><p class="ph-sub">One Pacific Tower · NXPT · live order book</p></div></div>
-        <div style="padding:8px 0 14px">
+        <div class="panel-h"><div><h2>Secondary market</h2><p class="ph-sub" id="obSub">One Pacific Tower · NXPT · sample data</p></div></div>
+        <div style="padding:8px 0 14px" id="obRows">
           <div class="ob-row"><span class="ob-side s">SELL</span><div class="ob-depth s"><i style="width:34%"></i></div><div class="ob-px">$262.00<span>120 tokens</span></div></div>
           <div class="ob-row"><span class="ob-side s">SELL</span><div class="ob-depth s"><i style="width:52%"></i></div><div class="ob-px">$259.50<span>240 tokens</span></div></div>
           <div class="ob-row"><span class="ob-side s">SELL</span><div class="ob-depth s"><i style="width:21%"></i></div><div class="ob-px">$257.25<span>85 tokens</span></div></div>
@@ -728,7 +728,48 @@ async function loadPortfolio(addr){
   }
 }
 
-(async()=>{ await loadOfferings(); OFFERINGS_CACHE = window._vestaOfferings || []; })();
+/* ════════ live order book (SecondaryMarket contract) ════════ */
+const MARKET_ABI = [
+  'function listingsCount() view returns (uint256)',
+  'function listings(uint256) view returns (address seller, uint256 remaining, uint256 pricePerToken, bool active)',
+];
+
+async function loadOrderBook(){
+  const withMarket = OFFERINGS_CACHE.find(o => o.contracts && o.contracts.secondary_market);
+  if(!withMarket || typeof ethers === 'undefined') return; // keep sample rows
+  try{
+    const provider = new ethers.JsonRpcProvider(CHAIN_RPC);
+    const market = new ethers.Contract(withMarket.contracts.secondary_market, MARKET_ABI, provider);
+    const count = Number(await market.listingsCount());
+    const rows = [];
+    for(let i = Math.max(0, count - 12); i < count; i++){
+      const [seller, remaining, pricePerToken, active] = await market.listings(i);
+      if(!active || remaining === 0n) continue;
+      rows.push({
+        tokens: Number(ethers.formatUnits(remaining, 18)),
+        price: Number(ethers.formatUnits(pricePerToken, 6)),
+        seller,
+      });
+    }
+    document.getElementById('obSub').textContent =
+      `${withMarket.name} · ${withMarket.symbol || ''} · live on-chain order book`;
+    const wrap = document.getElementById('obRows');
+    if(!rows.length){
+      wrap.innerHTML = '<div class="offer-empty">No open listings — post an ask from the app.</div>';
+      return;
+    }
+    rows.sort((a,b)=>a.price-b.price);
+    const maxTok = Math.max(...rows.map(r=>r.tokens));
+    wrap.innerHTML = rows.map(r=>`
+      <div class="ob-row">
+        <span class="ob-side s">ASK</span>
+        <div class="ob-depth s"><i style="width:${Math.max(8,(r.tokens/maxTok)*100)}%"></i></div>
+        <div class="ob-px">$${r.price.toFixed(2)}<span>${r.tokens.toLocaleString()} tokens · ${r.seller.slice(0,6)}…</span></div>
+      </div>`).join('');
+  }catch(e){ /* chain unreachable — leave sample rows */ }
+}
+
+(async()=>{ await loadOfferings(); OFFERINGS_CACHE = window._vestaOfferings || []; loadOrderBook(); })();
 </script>
 </body>
 </html>

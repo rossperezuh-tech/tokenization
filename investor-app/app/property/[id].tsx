@@ -229,6 +229,19 @@ export default function PropertyDetail() {
             </Label>
           )}
         </Card>
+
+        {/* Secondary market */}
+        {offering.contracts.secondary_market && (
+          <Card style={{ marginTop: 18 }}>
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <H2>Secondary market</H2>
+                <Label style={{ marginTop: 4 }}>Buy from or sell to other investors</Label>
+              </View>
+              <GoldButton label="Trade" onPress={() => router.push(`/trade/${id}`)} />
+            </View>
+          </Card>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

@@ -172,6 +172,7 @@ class TokenOffering(Base):
     token_address = Column(String(80))
     sale_address = Column(String(80))
     distribution_vault_address = Column(String(80))
+    secondary_market_address = Column(String(80))
     usdc_address = Column(String(80))
 
     total_tokens = Column(Float)            # whole tokens offered

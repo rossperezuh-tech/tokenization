@@ -12,6 +12,7 @@ deployed to **Base** (cheap L2 with native USDC).
 | `PropertyToken.sol` | ERC-20 (with snapshots) representing fractional ownership. Transfers are restricted to whitelisted investors via the registry. |
 | `PropertySale.sol` | Primary sale — investors pay USDC, receive tokens at a fixed price. Buying requires registry approval. |
 | `DistributionVault.sol` | Issuer deposits USDC rent; holders claim pro-rata by snapshot. |
+| `SecondaryMarket.sol` | P2P order book — sellers escrow tokens at an ask price, buyers fill with USDC. Both sides must be registry-whitelisted; optional platform fee (≤5%). |
 | `MockUSDC.sol` | 6-decimal test stablecoin for local/testnet. |
 
 ## Transfer agent & compliance

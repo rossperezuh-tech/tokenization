@@ -17,6 +17,7 @@ export type Offering = {
     token: string | null;
     sale: string | null;
     distribution_vault: string | null;
+    secondary_market: string | null;
     usdc: string | null;
   };
   total_tokens: number | null;

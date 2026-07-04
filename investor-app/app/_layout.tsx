@@ -37,6 +37,7 @@ export default function RootLayout() {
         <Stack.Screen name="property/[id]" options={{ title: "", headerTransparent: true }} />
         <Stack.Screen name="verify" options={{ title: "Verification", presentation: "modal" }} />
         <Stack.Screen name="subscribe/[id]" options={{ title: "Subscribe", presentation: "modal" }} />
+        <Stack.Screen name="trade/[id]" options={{ title: "Trade" }} />
       </Stack>
     </ThirdwebProvider>
   );
