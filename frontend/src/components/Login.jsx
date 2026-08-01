@@ -13,8 +13,17 @@ export default function Login({ onSuccess }) {
     try {
       await login(password)
       onSuccess()
-    } catch {
-      setError('Incorrect password')
+    } catch (err) {
+      // Distinguish a rejected password from the API being unreachable or
+      // misconfigured — otherwise every failure reads as "wrong password".
+      const status = err?.response?.status
+      if (status === 401) {
+        setError('Incorrect password')
+      } else if (status) {
+        setError(`API error ${status} at ${err.response.config?.baseURL || '/api'}`)
+      } else {
+        setError(`Could not reach the API at ${err?.config?.baseURL || '/api'}`)
+      }
     } finally {
       setBusy(false)
     }
