@@ -211,6 +211,14 @@ tbody tr:last-child td{border-bottom:none}
 .offer-empty{padding:30px 22px;font-family:var(--fs);color:var(--mid);font-size:14px}
 .offer-empty span{display:block;font-family:var(--fm);font-size:11px;color:var(--mut);margin-top:6px}
 </style>
+<!-- ── Vesta config ──────────────────────────────────────────────────────
+     This page is served as static HTML (no build step), so the backend URL
+     is set here rather than through an environment variable. Point it at
+     the Railway deployment, with no trailing slash. -->
+<script>
+  window.VESTA_API_URL = 'http://localhost:8000';
+  // window.VESTA_INVEST_URL = 'vesta://property';
+</script>
 </head>
 <body>
 <div class="app">

@@ -46,11 +46,6 @@ app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"], d
 app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"], dependencies=_op)
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"], dependencies=_op)
 
-# Serve built React frontend
-_frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-if os.path.isdir(_frontend_dist):
-    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")
-
 
 @app.on_event("startup")
 async def startup():
@@ -120,3 +115,11 @@ def _start_scheduler():
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "vesta-pipeline"}
+
+
+# Serve the built React frontend when it is present (local all-in-one runs).
+# Mounted last: StaticFiles at "/" matches every path, so registering it before
+# the routes above would shadow them — including the /health check.
+_frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.isdir(_frontend_dist):
+    app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")

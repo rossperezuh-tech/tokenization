@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+// In dev VITE_API_URL is unset and requests go to '/api', which the Vite proxy
+// forwards to localhost:8000. In a deployed build it holds the backend origin.
+const API_ROOT = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')
+const api = axios.create({ baseURL: `${API_ROOT}/api` })
 
 // ── auth ──────────────────────────────────────────────────────────────
 const TOKEN_KEY = 'vesta_operator_token'

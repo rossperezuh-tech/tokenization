@@ -9,8 +9,28 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 import enum
 import os
 
-DB_PATH = os.environ.get("VESTA_DB_PATH", "vesta.db")
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+def _build_engine():
+    """Postgres when DATABASE_URL is set (Railway et al), SQLite otherwise."""
+    url = os.environ.get("DATABASE_URL", "").strip()
+    if not url:
+        db_path = os.environ.get("VESTA_DB_PATH", "vesta.db")
+        return create_engine(
+            f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
+        )
+
+    # Heroku/Railway hand out the legacy "postgres://" scheme, which SQLAlchemy 2
+    # no longer registers. psycopg2 also wants the explicit driver name.
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg2://" + url[len("postgresql://"):]
+
+    # pool_recycle keeps us ahead of Postgres/proxy idle timeouts; pool_pre_ping
+    # discards connections the platform killed between requests.
+    return create_engine(url, pool_pre_ping=True, pool_recycle=300)
+
+
+engine = _build_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
