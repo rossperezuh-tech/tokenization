@@ -9,8 +9,28 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 import enum
 import os
 
-DB_PATH = os.environ.get("VESTA_DB_PATH", "vesta.db")
-engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+# Database URL resolution.
+#
+#   DATABASE_URL set  -> use it (Postgres in production). Cloud hosts have
+#                        ephemeral disks, so a SQLite file there would silently
+#                        lose data on every redeploy.
+#   otherwise         -> local SQLite file for development.
+#
+# Managed Postgres providers hand out "postgres://" URLs; SQLAlchemy 2.x needs
+# the explicit driver form, so normalize it here.
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+
+if DATABASE_URL:
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len("postgres://"):]
+    elif DATABASE_URL.startswith("postgresql://"):
+        DATABASE_URL = "postgresql+psycopg2://" + DATABASE_URL[len("postgresql://"):]
+    # pool_pre_ping drops connections the provider already closed.
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=5)
+else:
+    DB_PATH = os.environ.get("VESTA_DB_PATH", "vesta.db")
+    engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -207,7 +227,11 @@ class Investor(Base):
 
     # Status: pending | approved | rejected
     kyc_status = Column(String(40), default="pending")
+    # `accredited` is the transfer agent's VERIFIED determination and is the
+    # only flag that unlocks investing. What the investor ticks on the form is
+    # kept separately so it can never grant access by itself.
     accredited = Column(Boolean, default=False)
+    accredited_self_attested = Column(Boolean, default=False)
     accreditation_method = Column(String(120))   # e.g. "income", "net_worth", "third_party_letter"
 
     transfer_agent_id = Column(String(120))       # the TA's investor reference

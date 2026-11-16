@@ -24,13 +24,29 @@ logging.basicConfig(
 
 app = FastAPI(title="Vesta Tokenization Pipeline", version="0.1.0")
 
+# CORS: only the sites listed in ALLOWED_ORIGINS may call this API from a
+# browser. Auth is a bearer token in a header (no cookies), so credentials are
+# off. The default covers local development only — set ALLOWED_ORIGINS in
+# production to your deployed site URLs, comma-separated.
+_default_origins = "http://localhost:3000,http://localhost:5173,http://localhost:8081,http://localhost:8090"
+ALLOWED_ORIGINS = [
+    o.strip().rstrip("/")
+    for o in os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-TA-Secret"],
 )
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "service": "vesta-pipeline"}
 
 # Public: operator login + investor-facing catalogue / KYC (protected per-endpoint inside)
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
@@ -46,7 +62,8 @@ app.include_router(pipeline.router, prefix="/api/pipeline", tags=["pipeline"], d
 app.include_router(outreach.router, prefix="/api/outreach", tags=["outreach"], dependencies=_op)
 app.include_router(analytics.router, prefix="/api/analytics", tags=["analytics"], dependencies=_op)
 
-# Serve built React frontend
+# Optionally serve a locally built operator dashboard (frontend/dist). This
+# catch-all mount must stay AFTER every route above, or it swallows them.
 _frontend_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.isdir(_frontend_dist):
     app.mount("/", StaticFiles(directory=_frontend_dist, html=True), name="static")
@@ -55,7 +72,10 @@ if os.path.isdir(_frontend_dist):
 @app.on_event("startup")
 async def startup():
     init_db()
-    _start_scheduler()
+    # ENABLE_SCHEDULER=false lets you run extra web workers without each one
+    # firing its own copy of the polls, scrapes and digest emails.
+    if os.environ.get("ENABLE_SCHEDULER", "true").lower() != "false":
+        _start_scheduler()
 
 
 def _start_scheduler():
@@ -115,8 +135,3 @@ def _start_scheduler():
         logging.getLogger(__name__).info("Scheduler started")
     except ImportError as exc:
         logging.getLogger(__name__).warning("APScheduler not installed — scheduler disabled: %s", exc)
-
-
-@app.get("/health")
-def health():
-    return {"status": "ok", "service": "vesta-pipeline"}

@@ -95,12 +95,17 @@ def _fmt(o: TokenOffering) -> dict:
 
 
 @router.get("/")
-def list_offerings(live_only: bool = True, db: Session = Depends(get_db)):
-    """Public catalogue consumed by the investor app."""
-    q = db.query(TokenOffering)
-    if live_only:
-        q = q.filter(TokenOffering.is_live == True)
+def list_offerings(db: Session = Depends(get_db)):
+    """Public catalogue consumed by the investor app — LIVE offerings only."""
+    q = db.query(TokenOffering).filter(TokenOffering.is_live == True)
     return {"offerings": [_fmt(o) for o in q.order_by(TokenOffering.created_at.desc()).all()]}
+
+
+@router.get("/admin/all", dependencies=[Depends(require_operator)])
+def list_all_offerings(db: Session = Depends(get_db)):
+    """Operator view: every offering, including drafts."""
+    q = db.query(TokenOffering).order_by(TokenOffering.created_at.desc())
+    return {"offerings": [_fmt(o) for o in q.all()]}
 
 
 @router.get("/candidates", dependencies=[Depends(require_operator)])
@@ -129,7 +134,7 @@ def offering_candidates(db: Session = Depends(get_db)):
 @router.get("/{offering_id}")
 def get_offering(offering_id: int, db: Session = Depends(get_db)):
     o = db.query(TokenOffering).filter(TokenOffering.id == offering_id).first()
-    if not o:
+    if not o or not o.is_live:      # drafts are not public
         raise HTTPException(status_code=404, detail="Offering not found")
     return _fmt(o)
 
@@ -235,7 +240,7 @@ def update_offering(offering_id: int, body: OfferingUpdate, db: Session = Depend
     o = db.query(TokenOffering).filter(TokenOffering.id == offering_id).first()
     if not o:
         raise HTTPException(status_code=404, detail="Offering not found")
-    for field, value in body.dict(exclude_unset=True).items():
+    for field, value in body.model_dump(exclude_unset=True).items():
         setattr(o, field, value)
     db.commit()
     db.refresh(o)

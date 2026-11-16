@@ -56,14 +56,15 @@ def alert_hot_inbound(lead: Lead):
 
 def _send_email(to: str, subject: str, body: str):
     api_key = os.environ.get("RESEND_API_KEY", "")
-    if not api_key:
-        logger.warning("RESEND_API_KEY not set — email skipped")
+    from_addr = os.environ.get("ALERT_FROM_EMAIL", "") or os.environ.get("OUTREACH_FROM_EMAIL", "")
+    if not api_key or not from_addr:
+        logger.warning("RESEND_API_KEY / ALERT_FROM_EMAIL not set — email skipped")
         return
     try:
         import resend
         resend.api_key = api_key
         resend.Emails.send({
-            "from": "Vesta Pipeline <alerts@vestacapital.com>",
+            "from": from_addr,
             "to": to,
             "subject": subject,
             "text": body,
@@ -80,8 +81,8 @@ def build_daily_digest(db: Session) -> str:
     followups_due = (
         db.query(Outreach)
         .filter(
-            Outreach.followup_7d_due <= now,
-            Outreach.followup_7d_sent == False,
+            ((Outreach.followup_7d_due <= now) & (Outreach.followup_7d_sent == False))
+            | ((Outreach.followup_14d_due <= now) & (Outreach.followup_14d_sent == False))
         )
         .all()
     )
@@ -169,26 +170,36 @@ def send_weekly_report(db: Session):
     logger.info("Weekly report sent to %s", to)
 
 
-def check_price_drops(db: Session):
-    """Alert on any leads whose asking_price dropped since last scrape."""
+def check_price_drops(db: Session, since_hours: int = 24):
+    """Email price drops recorded in the last `since_hours` (one alert per drop,
+    rather than re-sending every historical drop on each run)."""
     from models.database import PriceHistory
-    leads_with_drops = db.query(Lead).filter(Lead.had_price_reduction == True).all()
     to = os.environ.get("ALERT_EMAIL", "")
-    if not to or not leads_with_drops:
+    if not to:
         return
-    lines = [f"PRICE DROP ALERT — {datetime.utcnow().strftime('%B %d, %Y')}", ""]
-    for lead in leads_with_drops[:20]:
-        prices = (
+    since = datetime.utcnow() - timedelta(hours=since_hours)
+    recent = (
+        db.query(PriceHistory)
+        .filter(PriceHistory.recorded_at >= since, PriceHistory.source.like("%_rescrape"))
+        .order_by(PriceHistory.recorded_at.desc())
+        .limit(50)
+        .all()
+    )
+    lines = []
+    for new in recent:
+        prev = (
             db.query(PriceHistory)
-            .filter(PriceHistory.lead_id == lead.id)
+            .filter(PriceHistory.lead_id == new.lead_id, PriceHistory.recorded_at < new.recorded_at)
             .order_by(PriceHistory.recorded_at.desc())
-            .limit(2)
-            .all()
+            .first()
         )
-        if len(prices) >= 2:
-            drop = prices[1].price - prices[0].price
+        lead = db.query(Lead).filter(Lead.id == new.lead_id).first()
+        if prev and lead and new.price < prev.price:
             lines.append(
-                f"  {lead.address}: ${prices[1].price:,.0f} → ${prices[0].price:,.0f} "
-                f"(↓${abs(drop):,.0f})"
+                f"  {lead.address}: ${prev.price:,.0f} -> ${new.price:,.0f} "
+                f"(down ${prev.price - new.price:,.0f})"
             )
-    _send_email(to, "Vesta: Price Drops Detected", "\n".join(lines))
+    if not lines:
+        return
+    header = [f"PRICE DROP ALERT - {datetime.utcnow().strftime('%B %d, %Y')}", ""]
+    _send_email(to, "Vesta: Price Drops Detected", "\n".join(header + lines))

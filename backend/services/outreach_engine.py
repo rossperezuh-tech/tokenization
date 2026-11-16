@@ -104,7 +104,7 @@ def generate_inbound_followup_email(lead: Lead) -> dict:
     price_line = f"We saw you're asking {price} — that's squarely in our acquisition range.\n" if lead.asking_price else ""
     reason_snippet = lead.reason_for_selling[:100] if lead.reason_for_selling else ""
     reason_line = (
-        'I noticed you mentioned: "' + reason_snippet + '" — we\'ve helped many owners in similar situations.\n'
+        'I noticed you mentioned: "' + reason_snippet + '" — I\'d like to understand your timeline so any offer fits it.\n'
         if lead.reason_for_selling else ""
     )
 
@@ -161,14 +161,18 @@ def save_outreach(lead: Lead, email_data: dict, db: Session) -> Outreach:
 
 def send_via_resend(to_email: str, subject: str, body: str, resend_message_id_ref: list) -> bool:
     api_key = os.environ.get("RESEND_API_KEY", "")
-    if not api_key:
-        logger.warning("RESEND_API_KEY not set — skipping email send")
+    # The sender must be an address on a domain YOU have verified in Resend.
+    # There is deliberately no default: mail "from" a domain you don't own is
+    # rejected or lands in spam, and may impersonate someone else's business.
+    from_addr = os.environ.get("OUTREACH_FROM_EMAIL", "")
+    if not api_key or not from_addr:
+        logger.warning("RESEND_API_KEY / OUTREACH_FROM_EMAIL not set — skipping email send")
         return False
     try:
         import resend
         resend.api_key = api_key
         resp = resend.Emails.send({
-            "from": "Vesta Capital <deals@vestacapital.com>",
+            "from": from_addr,
             "to": to_email,
             "subject": subject,
             "text": body,

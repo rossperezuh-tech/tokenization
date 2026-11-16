@@ -16,11 +16,11 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from models.database import Investor, Subscription, TokenOffering, get_db
-from services.auth import require_operator
+from services.auth import require_operator, require_investor, assert_wallet, normalize_wallet
 from services.docgen import generate_subscription_agreement
 
 router = APIRouter()
@@ -29,10 +29,10 @@ router = APIRouter()
 class SignBody(BaseModel):
     offering_id: int
     wallet_address: str
-    investor_name: str
-    investor_email: Optional[str] = None
-    token_amount: float
-    signature_name: str
+    investor_name: str = Field(min_length=2, max_length=200)
+    investor_email: Optional[str] = Field(default=None, max_length=200)
+    token_amount: float = Field(gt=0)
+    signature_name: str = Field(min_length=2, max_length=200)
     consent: bool
     agreement_sha256: str   # hash of the text the investor reviewed
 
@@ -68,7 +68,11 @@ def preview_agreement(
     db: Session = Depends(get_db),
 ):
     o = _get_offering(offering_id, db)
-    doc = generate_subscription_agreement(o, name or "[INVESTOR NAME]", wallet.lower(), tokens)
+    if not o.is_live:
+        raise HTTPException(status_code=404, detail="Offering not found")
+    doc = generate_subscription_agreement(
+        o, (name or "[INVESTOR NAME]")[:200], normalize_wallet(wallet), max(tokens, 0)
+    )
     return {
         "offering_id": offering_id,
         "text": doc["text"],
@@ -78,18 +82,31 @@ def preview_agreement(
 
 
 @router.post("/sign")
-def sign(body: SignBody, db: Session = Depends(get_db)):
+def sign(
+    body: SignBody,
+    token_wallet: str = Depends(require_investor),
+    db: Session = Depends(get_db),
+):
     if not body.consent:
         raise HTTPException(status_code=400, detail="Consent to electronic signature is required")
-    if body.token_amount <= 0:
-        raise HTTPException(status_code=400, detail="Token amount must be positive")
+
+    # The signer must be signed in with the wallet the agreement is for —
+    # otherwise anyone could "sign" on behalf of an approved investor.
+    wallet = normalize_wallet(body.wallet_address)
+    assert_wallet(token_wallet, wallet)
 
     o = _get_offering(body.offering_id, db)
-    wallet = body.wallet_address.lower()
+    if not o.is_live:
+        raise HTTPException(status_code=404, detail="Offering not found")
+    if o.sale_tokens and body.token_amount > o.sale_tokens:
+        raise HTTPException(status_code=400, detail="Token amount exceeds the offering size")
 
     inv = db.query(Investor).filter(Investor.wallet_address == wallet).first()
-    if not inv or inv.kyc_status != "approved":
-        raise HTTPException(status_code=403, detail="Wallet is not KYC-approved by the transfer agent")
+    if not inv or inv.kyc_status != "approved" or not inv.accredited:
+        raise HTTPException(
+            status_code=403,
+            detail="Wallet is not verified and accredited by the transfer agent",
+        )
 
     # Regenerate and require the hash to match what the investor reviewed —
     # guarantees the stored signature refers to exactly that text.
@@ -137,12 +154,13 @@ def status(offering_id: int, wallet_address: str, db: Session = Depends(get_db))
         db.query(Subscription)
         .filter(
             Subscription.offering_id == offering_id,
-            Subscription.wallet_address == wallet_address.lower(),
+            Subscription.wallet_address == normalize_wallet(wallet_address),
             Subscription.status.in_(["signed", "countersigned"]),
         )
         .first()
     )
-    return {"signed": sub is not None, "subscription": _fmt(sub) if sub else None}
+    # Public gate flag only — the signer's name and amounts stay private.
+    return {"signed": sub is not None, "status": sub.status if sub else None}
 
 
 @router.get("/", dependencies=[Depends(require_operator)])

@@ -17,6 +17,7 @@ find; upsert_listing does the rest. Missing fields are fine — the scorer and
 DB are tolerant of None.
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -122,7 +123,8 @@ def upsert_listing(listing: dict, source: str, db: Session) -> Optional[Lead]:
         url = listing.get("url") or ""
         if not addr and not url:
             return None
-        external_id = f"{source}:{abs(hash(addr + url))}"
+        digest = hashlib.sha256(f"{addr}|{url}".encode()).hexdigest()[:20]
+        external_id = f"{source}:{digest}"
 
     price = parse_price(listing.get("asking_price"))
     cap_rate = parse_cap_rate(listing.get("cap_rate"))
