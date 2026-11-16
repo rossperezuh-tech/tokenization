@@ -30,6 +30,14 @@ async function main() {
 
   // 1. USDC
   let usdcAddress = process.env.USDC_ADDRESS;
+  // Never deploy a freely-mintable test stablecoin on mainnet: anyone could
+  // mint it and buy the entire offering for nothing.
+  if (!usdcAddress && hre.network.name === "base") {
+    throw new Error(
+      "USDC_ADDRESS is required on Base mainnet " +
+      "(canonical USDC: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913). Refusing to deploy MockUSDC."
+    );
+  }
   if (!usdcAddress) {
     const MockUSDC = await hre.ethers.getContractFactory("MockUSDC");
     const usdc = await MockUSDC.deploy();
@@ -98,6 +106,12 @@ async function main() {
   await (await registry.setWhitelisted(issuer.address, true)).wait();
   await (await registry.setWhitelisted(saleAddress, true)).wait();
   await (await registry.setWhitelisted(marketAddress, true)).wait();
+
+  // Unsold inventory and market escrow belong to no one who can claim, so keep
+  // them out of the distribution base — otherwise their share of every rent
+  // payout would be stranded in the vault.
+  await (await vault.setExcluded(saleAddress, true)).wait();
+  await (await vault.setExcluded(marketAddress, true)).wait();
 
   const inventory = OFFERING.saleInventoryTokens * 10n ** 18n;
   await (await token.transfer(saleAddress, inventory)).wait();

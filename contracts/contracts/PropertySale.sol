@@ -86,9 +86,11 @@ contract PropertySale is Ownable, ReentrancyGuard {
     }
 
     // ── views ──────────────────────────────────────────────────────────
-    /// @notice USDC cost for `tokenAmount` (18dp) tokens.
+    /// @notice USDC cost for `tokenAmount` (18dp) tokens, rounded UP so a
+    ///         fractional amount can never be bought for less than its price
+    ///         (rounding down made dust-sized purchases free).
     function cost(uint256 tokenAmount) public view returns (uint256) {
-        return (tokenAmount * pricePerToken) / 1e18;
+        return (tokenAmount * pricePerToken + 1e18 - 1) / 1e18;
     }
 
     /// @notice Tokens still available for sale.
@@ -106,6 +108,7 @@ contract PropertySale is Ownable, ReentrancyGuard {
         require(tokenAmount > 0, "PropertySale: zero amount");
 
         uint256 c = cost(tokenAmount);
+        require(c > 0, "PropertySale: price not set");
         require(token.balanceOf(address(this)) >= tokenAmount, "PropertySale: sold out");
 
         payment.safeTransferFrom(msg.sender, address(this), c);

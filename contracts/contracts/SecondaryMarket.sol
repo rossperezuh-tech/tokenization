@@ -73,8 +73,10 @@ contract SecondaryMarket is Ownable, ReentrancyGuard {
         return listings.length;
     }
 
+    /// @notice USDC cost to fill `amount` of listing `id`, rounded UP so the
+    ///         seller is never short-changed on a fractional fill.
     function cost(uint256 id, uint256 amount) public view returns (uint256) {
-        return (amount * listings[id].pricePerToken) / 1e18;
+        return (amount * listings[id].pricePerToken + 1e18 - 1) / 1e18;
     }
 
     // ── sell side ──────────────────────────────────────────────────────
@@ -112,7 +114,7 @@ contract SecondaryMarket is Ownable, ReentrancyGuard {
         require(amount > 0 && amount <= l.remaining, "SecondaryMarket: bad amount");
         require(_approved(msg.sender), "SecondaryMarket: buyer not KYC-approved");
 
-        uint256 c = (amount * l.pricePerToken) / 1e18;
+        uint256 c = (amount * l.pricePerToken + 1e18 - 1) / 1e18;
         uint256 fee = (c * feeBps) / 10_000;
 
         l.remaining -= amount;

@@ -128,6 +128,49 @@ describe("Vesta property offering", function () {
     await expect(vault.connect(alice).claim(0)).to.be.revertedWith("DistributionVault: nothing to claim");
   });
 
+  it("excludes unsold inventory from the payout base so no rent is stranded", async () => {
+    await approveInvestors();
+    await vault.setExcluded(await sale.getAddress(), true);
+
+    const aliceAmt = ethers.parseUnits("300", 18);
+    const bobAmt = ethers.parseUnits("100", 18);
+    await usdc.connect(alice).approve(await sale.getAddress(), await sale.cost(aliceAmt));
+    await sale.connect(alice).buy(aliceAmt);
+    await usdc.connect(bob).approve(await sale.getAddress(), await sale.cost(bobAmt));
+    await sale.connect(bob).buy(bobAmt);
+
+    const income = 10_000n * 1_000000n;
+    await usdc.approve(await vault.getAddress(), income);
+    await vault.distribute(income);
+
+    // Eligible base = issuer's 30,000 + Alice 300 + Bob 100 (sale's 69,600 excluded)
+    const eligible = ethers.parseUnits("30400", 18);
+    const a = await vault.claimable(0, alice.address);
+    const b = await vault.claimable(0, bob.address);
+    const i = await vault.claimable(0, issuer.address);
+    expect(a).to.equal((aliceAmt * income) / eligible);
+    expect(await vault.claimable(0, await sale.getAddress())).to.equal(0n);
+
+    // Everything paid in is claimable by real holders (bar integer rounding dust)
+    expect(income - (a + b + i)).to.be.lessThan(3n);
+
+    // claimAll pays out and a second call is a harmless no-op
+    const before = await usdc.balanceOf(bob.address);
+    await vault.connect(bob).claimAll();
+    expect((await usdc.balanceOf(bob.address)) - before).to.equal(b);
+    await vault.connect(bob).claimAll();
+    expect((await usdc.balanceOf(bob.address)) - before).to.equal(b);
+  });
+
+  it("rounds cost up so dust-sized purchases are never free", async () => {
+    await approveInvestors();
+    const dust = 10_000_000_000n; // 1e-8 of a token: floor(cost) would be 0
+    expect(await sale.cost(dust)).to.equal(1n);
+    await usdc.connect(alice).approve(await sale.getAddress(), 1n);
+    await sale.connect(alice).buy(dust);
+    expect(await sale.totalRaised()).to.equal(1n);
+  });
+
   it("secondary market: list, partial fill with fee, cancel, KYC gates", async () => {
     await approveInvestors();
     const market = await (await ethers.getContractFactory("SecondaryMarket")).deploy(

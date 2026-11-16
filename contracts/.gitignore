@@ -5,3 +5,4 @@ typechain-types/
 .env
 coverage/
 coverage.json
+hardhat.local.config.js
