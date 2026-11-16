@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useActiveAccount } from "thirdweb/react";
 import { submitKyc } from "../lib/api";
+import { getInvestorToken } from "../lib/session";
 import { Card, H2, Label, Body, GoldButton } from "../components/ui";
 import { colors, font } from "../constants/theme";
 
@@ -31,6 +32,8 @@ export default function Verify() {
     }
     try {
       setBusy(true);
+      // Prove wallet ownership (free signature) so nobody else can file for this wallet.
+      const token = await getInvestorToken(account);
       await submitKyc({
         wallet_address: account.address,
         full_name: name,
@@ -38,7 +41,7 @@ export default function Verify() {
         country,
         accredited,
         accreditation_method: accredited ? "self_attested" : undefined,
-      });
+      }, token);
       Alert.alert(
         "Submitted for review",
         "Your application has been sent to our transfer agent. You'll be able to invest once it's approved.",

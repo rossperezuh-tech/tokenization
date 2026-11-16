@@ -3,9 +3,10 @@ import { View, ScrollView, TextInput, StyleSheet, Text, Alert, ActivityIndicator
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
-import { prepareContractCall, sendTransaction, getContract } from "thirdweb";
+import { prepareContractCall, sendAndConfirmTransaction, getContract } from "thirdweb";
 import { client, activeChain, USDC_ADDRESS } from "../../lib/thirdweb";
 import { fetchOffering, type Offering } from "../../lib/api";
+import { NULL_CONTRACT } from "../../lib/contracts";
 import { Card, H2, Label, Mono, Body, GoldButton, Pill } from "../../components/ui";
 import { colors, font } from "../../constants/theme";
 import { usd, fromTokens, toTokens, toUsdc, fromUsdc } from "../../lib/format";
@@ -34,7 +35,7 @@ export default function Trade() {
   const market = marketAddr ? getContract({ client, chain: activeChain, address: marketAddr }) : undefined;
 
   const { data: count } = useReadContract({
-    contract: market!,
+    contract: market ?? NULL_CONTRACT,
     method: "function listingsCount() view returns (uint256)",
     queryOptions: { enabled: !!market, refetchInterval: 15000 },
   });
@@ -73,13 +74,13 @@ export default function Trade() {
         method: "function approve(address spender, uint256 amount) returns (bool)",
         params: [marketAddr!, toTokens(amt)],
       });
-      await sendTransaction({ transaction: approveTx, account });
+      await sendAndConfirmTransaction({ transaction: approveTx, account });
       const listTx = prepareContractCall({
         contract: market,
         method: "function list(uint256 amount, uint256 pricePerToken) returns (uint256)",
         params: [toTokens(amt), toUsdc(price)],
       });
-      await sendTransaction({ transaction: listTx, account });
+      await sendAndConfirmTransaction({ transaction: listTx, account });
       Alert.alert("Listed", `${amt} tokens listed at ${usd(price, 2)} each.`);
       setRefreshKey((k) => k + 1);
     } catch (e: any) {
@@ -162,22 +163,23 @@ function ListingRow({ market, marketAddr, index, symbol, onFilled }: {
         const tx = prepareContractCall({
           contract: market, method: "function cancel(uint256 id)", params: [BigInt(index)],
         });
-        await sendTransaction({ transaction: tx, account });
+        await sendAndConfirmTransaction({ transaction: tx, account });
         Alert.alert("Cancelled", "Your tokens were returned.");
       } else {
         const usdc = getContract({ client, chain: activeChain, address: USDC_ADDRESS });
-        const cost = (remaining * pricePerToken) / 10n ** 18n;
+        // Rounded up, matching the contract, so the approval is never 1 unit short.
+        const cost = (remaining * pricePerToken + 10n ** 18n - 1n) / 10n ** 18n;
         const approveTx = prepareContractCall({
           contract: usdc,
           method: "function approve(address spender, uint256 amount) returns (bool)",
           params: [marketAddr, cost],
         });
-        await sendTransaction({ transaction: approveTx, account });
+        await sendAndConfirmTransaction({ transaction: approveTx, account });
         const fillTx = prepareContractCall({
           contract: market, method: "function fill(uint256 id, uint256 amount)",
           params: [BigInt(index), remaining],
         });
-        await sendTransaction({ transaction: fillTx, account });
+        await sendAndConfirmTransaction({ transaction: fillTx, account });
         Alert.alert("Filled", `You bought ${remainingNum.toLocaleString()} ${symbol}.`);
       }
       onFilled();

@@ -5,7 +5,7 @@ import { Link } from "expo-router";
 import type { Offering } from "../lib/api";
 import { Card, H2, Label, Mono, Pill, Progress } from "./ui";
 import { colors, font } from "../constants/theme";
-import { saleContract } from "../lib/contracts";
+import { saleContract, NULL_CONTRACT } from "../lib/contracts";
 import { usd, usdCompact, pct, fromTokens } from "../lib/format";
 
 /**
@@ -18,7 +18,7 @@ export function OfferingCard({ offering }: { offering: Offering }) {
   const contract = saleAddr ? saleContract(saleAddr) : undefined;
 
   const { data: tokensSold } = useReadContract({
-    contract: contract!,
+    contract: contract ?? NULL_CONTRACT,
     method: "function tokensSold() view returns (uint256)",
     queryOptions: { enabled: !!contract },
   });

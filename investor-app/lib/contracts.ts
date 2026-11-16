@@ -54,3 +54,15 @@ export function vaultContract(address: string) {
 export function usdcContract(address: string) {
   return getContract({ client, chain: activeChain, address });
 }
+
+/**
+ * Placeholder passed to read hooks while the real contract address is still
+ * loading (or absent). thirdweb's useReadContract dereferences `contract`
+ * even when the query is disabled, so passing `undefined` crashes the screen.
+ * Always pair with `queryOptions: { enabled: !!realContract }`.
+ */
+export const NULL_CONTRACT = getContract({
+  client,
+  chain: activeChain,
+  address: "0x0000000000000000000000000000000000000000",
+});

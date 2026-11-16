@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&family=Outfit:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<script src="vendor/ethers-6.13.4.umd.min.js"></script>
 <style>
 /* ════════════════════════════════════════════════════════════════
    NEXUS — investor dashboard v2
@@ -233,14 +233,14 @@ tbody tr:last-child td{border-bottom:none}
     <a class="snav" href="#"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
   </nav>
   <div class="side-foot">
-    KYC <b>VERIFIED</b> · ACCREDITED<br/>Member since 2024
+    PREVIEW MODE<br/>Connect a wallet to see your status
   </div>
 </aside>
 
 <!-- ═══ MAIN ═══ -->
 <main>
   <div class="topbar">
-    <h1 class="tb-title">Good afternoon, J.</h1>
+    <h1 class="tb-title">Investor portal</h1>
     <div class="tb-right">
       <label class="tb-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg><input type="text" placeholder="Search assets, documents…" aria-label="Search"/></label>
       <button class="tb-bell" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><i></i></button>
@@ -249,6 +249,11 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 
   <div class="wrap">
+
+    <!-- Preview notice: shown until a wallet connects and real data replaces the samples -->
+    <div id="demoNotice" style="margin-bottom:22px;padding:11px 16px;border-radius:9px;border:1px dashed var(--line);font-family:var(--fm);font-size:11px;letter-spacing:.04em;color:var(--mid)">
+      PREVIEW · Portfolio figures, holdings and distributions below are sample data until you connect a wallet. Nothing on this page is an offer to sell securities.
+    </div>
 
     <!-- KYC banner (shown when a connected wallet isn't verified) -->
     <div id="kycBanner" style="display:none;margin-bottom:22px;padding:14px 18px;border-radius:11px;border:1px solid var(--line);background:var(--gold-dim);font-family:var(--fs);font-size:13.5px;color:var(--cream)"></div>
@@ -436,6 +441,12 @@ const HOLDINGS=[
 ];
 
 /* ════════ helpers ════════ */
+// Offering names and addresses originate from public form submissions and
+// scraped listings, so they are untrusted. Escape before any innerHTML use.
+const esc = v => String(v ?? '').replace(/[&<>"'`]/g, ch => (
+  {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','`':'&#96;'}[ch]));
+const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+
 const $=s=>document.querySelector(s);
 const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
 const dpr=window.devicePixelRatio||1;
@@ -574,7 +585,7 @@ function renderTable(){
   });
   $('#hBody').innerHTML=rows.map(r=>`
     <tr>
-      <td><div class="asset"><i style="background:${r.c}"></i><div><b>${r.name}</b><span>${r.sub} · ${r.sym}</span></div></div></td>
+      <td><div class="asset"><i style="background:${esc(r.c)}"></i><div><b>${esc(r.name)}</b><span>${esc(r.sub)} · ${esc(r.sym)}</span></div></div></td>
       <td class="mono">${r.tokens.toLocaleString()}</td>
       <td class="mono">${fmt(r.value)}</td>
       <td><span class="yield-pill">${r.yield.toFixed(1)}%</span></td>
@@ -608,26 +619,26 @@ const compact = n => n==null ? '—'
 function offerCard(o){
   const p = o.property || {};
   const loc = [p.city,p.state].filter(Boolean).join(', ');
-  const total = o.sale_tokens || 0;
+  const total = num(o.sale_tokens);
   // subscription % is filled from on-chain in the app; here we show target progress if known
-  const subscribed = o.subscribed_pct != null ? o.subscribed_pct : 0;
+  const subscribed = num(o.subscribed_pct);
   return `
     <div class="offer-card">
       <div class="oc-top">
         <div>
-          <div class="oc-name">${o.name || p.address || 'Offering'}</div>
-          <div class="oc-loc">${loc || '—'} · ${p.property_type || '—'}</div>
+          <div class="oc-name">${esc(o.name || p.address || 'Offering')}</div>
+          <div class="oc-loc">${esc(loc || '—')} · ${esc(p.property_type || '—')}</div>
         </div>
-        <span class="oc-yield">${o.projected_yield!=null?o.projected_yield.toFixed(1):'—'}% yield</span>
+        <span class="oc-yield">${o.projected_yield!=null?num(o.projected_yield).toFixed(1):'—'}% yield</span>
       </div>
       <div class="oc-stats">
-        <div class="oc-stat"><div class="l">Token price</div><div class="v">${o.token_price_usdc!=null?'$'+o.token_price_usdc.toFixed(2):'—'}</div></div>
+        <div class="oc-stat"><div class="l">Token price</div><div class="v">${o.token_price_usdc!=null?'$'+num(o.token_price_usdc).toFixed(2):'—'}</div></div>
         <div class="oc-stat"><div class="l">Target raise</div><div class="v">${compact(o.target_raise_usd)}</div></div>
         <div class="oc-stat"><div class="l">Valuation</div><div class="v">${compact(p.asking_price)}</div></div>
       </div>
       <div class="oc-prog"><span>${subscribed.toFixed(0)}% subscribed</span><span>${total.toLocaleString()} tokens</span></div>
       <div class="oc-bar"><i style="width:${Math.min(100,subscribed)}%"></i></div>
-      <a class="oc-btn" href="${INVEST_URL}/${o.id}">View &amp; invest →</a>
+      <a class="oc-btn" href="${esc(INVEST_URL)}/${encodeURIComponent(o.id)}" rel="noopener">View &amp; invest →</a>
     </div>`;
 }
 
@@ -635,7 +646,7 @@ async function loadOfferings(){
   const grid = document.getElementById('offerGrid');
   grid.innerHTML = '<div class="offer-empty">Loading offerings…</div>';
   try{
-    const res = await fetch(`${VESTA_API}/api/offerings/?live_only=true`);
+    const res = await fetch(`${VESTA_API}/api/offerings/`);
     if(!res.ok) throw new Error('HTTP '+res.status);
     const data = await res.json();
     const list = data.offerings || [];
@@ -646,7 +657,7 @@ async function loadOfferings(){
     }
     grid.innerHTML = list.map(offerCard).join('');
   }catch(e){
-    grid.innerHTML = `<div class="offer-empty">Couldn't reach the offerings API at ${VESTA_API}.<span>Set window.VESTA_API_URL or start the backend, then Refresh.</span></div>`;
+    grid.innerHTML = `<div class="offer-empty">Couldn't reach the offerings API at ${esc(VESTA_API)}.<span>Set window.VESTA_API_URL or start the backend, then Refresh.</span></div>`;
   }
 }
 document.getElementById('offRefresh').addEventListener('click',loadOfferings);
@@ -666,6 +677,7 @@ async function vestaConnect(){
     CONNECTED = accs[0];
     document.getElementById('cbLabel').textContent = CONNECTED.slice(0,6)+'…'+CONNECTED.slice(-4);
     document.getElementById('cbAva').textContent = '◆';
+    const dn = document.getElementById('demoNotice'); if(dn) dn.style.display = 'none';
     await Promise.all([checkKyc(CONNECTED), loadPortfolio(CONNECTED)]);
   }catch(e){ console.warn('connect failed', e); }
 }
@@ -673,7 +685,7 @@ async function vestaConnect(){
 async function checkKyc(addr){
   const banner = document.getElementById('kycBanner');
   try{
-    const r = await fetch(`${VESTA_API}/api/investors/${addr}/status`);
+    const r = await fetch(`${VESTA_API}/api/investors/${encodeURIComponent(addr)}/status`);
     const s = await r.json();
     if(s.can_invest){ banner.style.display='none'; return; }
     banner.style.display='block';
@@ -683,12 +695,12 @@ async function checkKyc(addr){
       ? 'Your verification was not approved. Please contact support.'
       : 'Investing requires identity & accreditation verification by our licensed transfer agent.';
     banner.innerHTML = `◆ ${msg}` + (s.kyc_status==='not_started'||!s.kyc_status
-      ? ` <a href="${INVEST_URL.replace('/property','')}/verify" style="color:var(--gold2);text-decoration:underline">Get verified →</a>` : '');
+      ? ` <a href="${esc(INVEST_URL.replace('/property',''))}/verify" style="color:var(--gold2);text-decoration:underline">Get verified →</a>` : '');
   }catch(e){ banner.style.display='none'; }
 }
 
 async function loadPortfolio(addr){
-  if(!ethers || !OFFERINGS_CACHE.length) return;
+  if(typeof ethers === 'undefined' || !OFFERINGS_CACHE.length) return;
   const provider = new ethers.JsonRpcProvider(CHAIN_RPC);
   const holdings=[]; let totalValue=0, totalClaimable=0, yieldNum=0;
   for(const o of OFFERINGS_CACHE){
@@ -764,7 +776,7 @@ async function loadOrderBook(){
       <div class="ob-row">
         <span class="ob-side s">ASK</span>
         <div class="ob-depth s"><i style="width:${Math.max(8,(r.tokens/maxTok)*100)}%"></i></div>
-        <div class="ob-px">$${r.price.toFixed(2)}<span>${r.tokens.toLocaleString()} tokens · ${r.seller.slice(0,6)}…</span></div>
+        <div class="ob-px">$${r.price.toFixed(2)}<span>${r.tokens.toLocaleString()} tokens · ${esc(String(r.seller).slice(0,6))}…</span></div>
       </div>`).join('');
   }catch(e){ /* chain unreachable — leave sample rows */ }
 }

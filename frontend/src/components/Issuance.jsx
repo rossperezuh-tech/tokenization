@@ -23,7 +23,7 @@ export default function Issuance() {
   const [msg, setMsg] = useState('')
 
   async function load() {
-    const [c, p] = await Promise.all([getOfferingCandidates(), getOfferings(false)])
+    const [c, p] = await Promise.all([getOfferingCandidates(), getOfferings()])
     setCandidates(c.data.candidates)
     setPublished(p.data.offerings)
   }

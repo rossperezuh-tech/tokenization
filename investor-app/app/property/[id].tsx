@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { View, ScrollView, TextInput, StyleSheet, Text, ActivityIndicator, Alert, Linking, Pressable } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
-import { useActiveAccount, useReadContract, useSendTransaction } from "thirdweb/react";
-import { prepareContractCall, sendTransaction } from "thirdweb";
+import { useActiveAccount, useReadContract } from "thirdweb/react";
+import { prepareContractCall, readContract, sendAndConfirmTransaction } from "thirdweb";
 import {
   fetchOffering, fetchKycStatus, fetchOfferingDocuments, fetchSubscriptionStatus, documentUrl,
   type Offering, type KycStatus, type DataRoomDoc,
 } from "../../lib/api";
-import { saleContract, usdcContract } from "../../lib/contracts";
+import { saleContract, usdcContract, NULL_CONTRACT } from "../../lib/contracts";
 import { USDC_ADDRESS } from "../../lib/thirdweb";
 import { Card, H2, Label, Mono, Body, Pill, GoldButton, Progress } from "../../components/ui";
 import { ConnectBar } from "../../components/ConnectBar";
@@ -50,7 +50,7 @@ export default function PropertyDetail() {
   const contract = saleAddr ? saleContract(saleAddr) : undefined;
 
   const { data: sold } = useReadContract({
-    contract: contract!,
+    contract: contract ?? NULL_CONTRACT,
     method: "function tokensSold() view returns (uint256)",
     queryOptions: { enabled: !!contract },
   });
@@ -95,24 +95,34 @@ export default function PropertyDetail() {
     try {
       setBusy(true);
       const usdc = usdcContract(USDC_ADDRESS);
+      const amount = toTokens(tokens);
 
-      // 1) Approve USDC for the sale contract
+      // Ask the contract for the exact cost rather than recomputing it here,
+      // so the approval always matches what `buy` will pull.
+      const exactCost = await readContract({
+        contract,
+        method: "function cost(uint256 tokenAmount) view returns (uint256)",
+        params: [amount],
+      });
+
+      // 1) Approve USDC for the sale contract — and wait until it is mined.
+      //    Sending `buy` before the approval confirms makes it revert.
       const approveTx = prepareContractCall({
         contract: usdc,
         method: "function approve(address spender, uint256 amount) returns (bool)",
-        params: [saleAddr, toUsdc(cost)],
+        params: [saleAddr, exactCost],
       });
-      await sendTransaction({ transaction: approveTx, account });
+      await sendAndConfirmTransaction({ transaction: approveTx, account });
 
       // 2) Buy tokens
       const buyTx = prepareContractCall({
         contract,
         method: "function buy(uint256 tokenAmount)",
-        params: [toTokens(tokens)],
+        params: [amount],
       });
-      await sendTransaction({ transaction: buyTx, account });
+      await sendAndConfirmTransaction({ transaction: buyTx, account });
 
-      Alert.alert("Purchase complete", `You bought ${tokens} ${offering.symbol ?? "tokens"}.`);
+      Alert.alert("Purchase complete", `You bought ${tokens} ${offering?.symbol ?? "tokens"}.`);
     } catch (e: any) {
       Alert.alert("Transaction failed", e?.message ?? "Something went wrong.");
     } finally {

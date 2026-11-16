@@ -5,7 +5,8 @@ import { useActiveAccount, useReadContract } from "thirdweb/react";
 import { fetchOfferings, fetchInvestorDocuments, documentUrl, type Offering, type DataRoomDoc } from "../../lib/api";
 import { tokenContract } from "../../lib/contracts";
 import { ConnectBar } from "../../components/ConnectBar";
-import { Card, H2, Label, Mono, Body, Pill } from "../../components/ui";
+import { getInvestorToken } from "../../lib/session";
+import { Card, H2, Label, Mono, Body, Pill, GoldButton } from "../../components/ui";
 import { colors, font } from "../../constants/theme";
 import { usd, fromTokens } from "../../lib/format";
 
@@ -18,13 +19,25 @@ export default function Portfolio() {
     fetchOfferings().then(setOfferings).catch(() => {});
   }, []);
 
+  const [docsLoaded, setDocsLoaded] = useState(false);
+
+  // Reset when the wallet changes; private documents are fetched only on request.
   useEffect(() => {
-    if (account) {
-      fetchInvestorDocuments(account.address).then(setMyDocs).catch(() => setMyDocs([]));
-    } else {
+    setMyDocs([]);
+    setDocsLoaded(false);
+  }, [account?.address]);
+
+  async function loadMyDocs() {
+    if (!account) return;
+    try {
+      const token = await getInvestorToken(account);
+      setMyDocs(await fetchInvestorDocuments(account.address, token));
+    } catch {
       setMyDocs([]);
+    } finally {
+      setDocsLoaded(true);
     }
-  }, [account]);
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -43,6 +56,20 @@ export default function Portfolio() {
           offerings
             .filter((o) => o.contracts.token)
             .map((o) => <Holding key={o.id} offering={o} owner={account.address} />)
+        )}
+
+        {account && !docsLoaded && (
+          <Card style={{ marginTop: 10 }}>
+            <H2>Your documents</H2>
+            <Label style={{ marginTop: 4, marginBottom: 12 }}>K-1s · signed agreements · private to you</Label>
+            <GoldButton label="Sign in to view documents" onPress={loadMyDocs} />
+          </Card>
+        )}
+
+        {account && docsLoaded && myDocs.length === 0 && (
+          <Card style={{ marginTop: 10 }}>
+            <Body>No documents yet.</Body>
+          </Card>
         )}
 
         {account && myDocs.length > 0 && (

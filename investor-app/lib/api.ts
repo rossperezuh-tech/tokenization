@@ -59,7 +59,6 @@ export type KycStatus = {
   wallet_address: string;
   kyc_status: "not_started" | "pending" | "approved" | "rejected";
   can_invest: boolean;
-  full_name?: string;
 };
 
 export async function fetchKycStatus(address: string): Promise<KycStatus> {
@@ -83,8 +82,11 @@ export async function fetchOfferingDocuments(offeringId: number): Promise<DataRo
   return (await res.json()).documents as DataRoomDoc[];
 }
 
-export async function fetchInvestorDocuments(address: string): Promise<DataRoomDoc[]> {
-  const res = await fetch(`${BASE}/api/documents/investor/${address}`);
+/** Private: requires the investor session token for this wallet. */
+export async function fetchInvestorDocuments(address: string, token: string): Promise<DataRoomDoc[]> {
+  const res = await fetch(`${BASE}/api/documents/investor/${address}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok) return [];
   return (await res.json()).documents as DataRoomDoc[];
 }
@@ -117,10 +119,10 @@ export async function signSubscription(payload: {
   signature_name: string;
   consent: boolean;
   agreement_sha256: string;
-}) {
+}, token: string) {
   const res = await fetch(`${BASE}/api/subscriptions/sign`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -147,12 +149,15 @@ export async function submitKyc(payload: {
   country?: string;
   accredited: boolean;
   accreditation_method?: string;
-}): Promise<KycStatus> {
+}, token: string): Promise<KycStatus> {
   const res = await fetch(`${BASE}/api/investors/submit`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`KYC submit failed: ${res.status}`);
+  if (!res.ok) {
+    const detail = (await res.json().catch(() => null))?.detail;
+    throw new Error(typeof detail === "string" ? detail : `KYC submit failed: ${res.status}`);
+  }
   return (await res.json()) as KycStatus;
 }

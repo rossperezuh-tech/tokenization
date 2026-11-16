@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { View, ScrollView, StyleSheet, Text, Alert, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useActiveAccount, useReadContract } from "thirdweb/react";
-import { prepareContractCall, sendTransaction } from "thirdweb";
+import { prepareContractCall, sendAndConfirmTransaction } from "thirdweb";
 import { fetchOfferings, type Offering } from "../../lib/api";
 import { vaultContract } from "../../lib/contracts";
 import { ConnectBar } from "../../components/ConnectBar";
@@ -60,7 +60,7 @@ function ClaimRow({ offering, owner }: { offering: Offering; owner: string }) {
     try {
       setBusy(true);
       const tx = prepareContractCall({ contract, method: "function claimAll()", params: [] });
-      await sendTransaction({ transaction: tx, account });
+      await sendAndConfirmTransaction({ transaction: tx, account });
       Alert.alert("Claimed", `Income from ${offering.name} sent to your wallet.`);
     } catch (e: any) {
       Alert.alert("Claim failed", e?.message ?? "Something went wrong.");

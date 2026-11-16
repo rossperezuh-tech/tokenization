@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { useActiveAccount } from "thirdweb/react";
 import { fetchAgreement, signSubscription, type AgreementPreview } from "../../lib/api";
+import { getInvestorToken } from "../../lib/session";
 import { Card, Label, Body, GoldButton, Mono } from "../../components/ui";
 import { colors, font } from "../../constants/theme";
 import { usd } from "../../lib/format";
@@ -44,6 +45,7 @@ export default function Subscribe() {
     }
     try {
       setBusy(true);
+      const token = await getInvestorToken(account);
       await signSubscription({
         offering_id: offeringId,
         wallet_address: account.address,
@@ -52,7 +54,7 @@ export default function Subscribe() {
         signature_name: signature.trim(),
         consent,
         agreement_sha256: agreement.sha256,
-      });
+      }, token);
       Alert.alert("Agreement signed", "Your subscription is recorded. You can now complete your purchase.", [
         { text: "Continue", onPress: () => router.back() },
       ]);

@@ -1,6 +1,11 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+// In production the API lives on a different host than this site, so the base
+// URL comes from VITE_API_URL (set it in Vercel → Settings → Environment
+// Variables, e.g. https://your-backend.up.railway.app). Locally it is empty and
+// Vite's dev proxy forwards /api to the backend.
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')
+const api = axios.create({ baseURL: `${API_BASE}/api` })
 
 // ── auth ──────────────────────────────────────────────────────────────
 const TOKEN_KEY = 'vesta_operator_token'
@@ -36,8 +41,8 @@ export const logout = () => clearToken()
 export const getOfferingCandidates = () => api.get('/offerings/candidates')
 export const getDeployConfig = (payload) => api.post('/offerings/deploy-config', payload)
 export const createOffering = (payload) => api.post('/offerings/', payload)
-export const getOfferings = (liveOnly = false) =>
-  api.get('/offerings/', { params: { live_only: liveOnly } })
+// Operator view: every offering including drafts (the public endpoint is live-only).
+export const getOfferings = () => api.get('/offerings/admin/all')
 
 export const getLeads = (params = {}) => api.get('/leads/', { params })
 export const getLead = (id) => api.get(`/leads/${id}`)
